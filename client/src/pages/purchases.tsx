@@ -21,25 +21,22 @@ export default function PurchasesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Cards query — usando chave ["expenses", "/card"]
   const { data: cards = [] } = useQuery<CardType[]>({
-    queryKey: ["expenses", "/card"],
+    queryKey: ["/api/cards"],
   });
 
-  // Purchases query — chave ["expenses", "/purchase"]
   const { data: allPurchases = [], isLoading } = useQuery<(Purchase & { card: CardType })[]>({
-    queryKey: ["expenses", "/purchase"],
+    queryKey: ["/api/purchases"],
   });
 
-  // Deletar compra — mutation
   const deletePurchaseMutation = useMutation({
     mutationFn: async (purchaseId: string) => {
-      const response = await apiRequest("DELETE", `/purchase/${purchaseId}`);
+      const response = await apiRequest("DELETE", `/api/purchases/${purchaseId}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses", "/purchase"] });
-      queryClient.invalidateQueries({ queryKey: ["expenses", "/monthly_invoice"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       toast({
         title: "Sucesso",
         description: "Compra removida com sucesso!",
@@ -87,7 +84,7 @@ export default function PurchasesPage() {
     outros: "Outros",
   };
 
-  // Categorias únicas disponíveis para filtro
+  // Get unique categories
   const availableCategories = Array.from(
     new Set(allPurchases.map((p) => p.category))
   );
@@ -128,7 +125,7 @@ export default function PurchasesPage() {
               </Button>
             </div>
 
-            {/* Filtros */}
+            {/* Filters */}
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               <Select value={selectedBank} onValueChange={setSelectedBank}>
                 <SelectTrigger>
@@ -159,7 +156,7 @@ export default function PurchasesPage() {
               </Select>
             </div>
 
-            {/* Lista de compras */}
+            {/* Purchase List */}
             {isLoading ? (
               <div className="text-center py-8 text-gray-500">
                 Carregando compras...

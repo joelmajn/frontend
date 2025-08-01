@@ -133,7 +133,42 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "/api/purchases", data);
+      const selectedCard = cards.find(card => card.id === data.cardId);
+      if (!selectedCard) throw new Error("Cartão não encontrado");
+
+      // Calcular dados da compra
+      const totalValue = parseFloat(data.totalValue);
+      const installmentValue = totalValue / data.totalInstallments;
+      
+      // Calcular mês da fatura
+      let invoiceMonth: string;
+      if (useManualMonth && data.manualInvoiceMonth) {
+        invoiceMonth = data.manualInvoiceMonth;
+      } else {
+        const purchaseDate = new Date(data.purchaseDate);
+        const closingDay = selectedCard.closingDay;
+        if (purchaseDate.getDate() >= closingDay) {
+          const nextMonth = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 1);
+          invoiceMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+        } else {
+          invoiceMonth = `${purchaseDate.getFullYear()}-${String(purchaseDate.getMonth() + 1).padStart(2, '0')}`;
+        }
+      }
+
+      // Transformar dados para formato do Xano
+      const xanoData = {
+        card_id: data.cardId,
+        purchase_date: data.purchaseDate,
+        name: data.name,
+        category: data.category,
+        total_value: totalValue,
+        total_installments: data.totalInstallments,
+        current_installment: 1,
+        installment_value: installmentValue,
+        invoice_month: invoiceMonth,
+      };
+
+      const response = await apiRequest("POST", "/api/purchases", xanoData);
       return response.json();
     },
     onSuccess: () => {
@@ -158,12 +193,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   });
 
   const onSubmit = (data: FormData) => {
-    const purchaseData = {
-      ...data,
-      totalValue: data.totalValue, // Keep as string for schema transformation
-      manualInvoiceMonth: useManualMonth ? data.manualInvoiceMonth : undefined,
-    };
-    createPurchaseMutation.mutate(purchaseData);
+    createPurchaseMutation.mutate(data);
   };
 
 

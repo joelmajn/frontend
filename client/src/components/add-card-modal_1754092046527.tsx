@@ -30,7 +30,14 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
 
   const createCardMutation = useMutation({
     mutationFn: async (data: InsertCard) => {
-      const response = await apiRequest("POST", "/api/cards", data);
+      // Transformar dados para formato do Xano
+      const xanoData = {
+        bank_name: data.bankName,
+        logo_url: data.logoUrl || "",
+        closing_day: data.closingDay,
+        due_day: data.dueDay,
+      };
+      const response = await apiRequest("POST", "/api/cards", xanoData);
       return response.json();
     },
     onSuccess: () => {
