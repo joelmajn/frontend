@@ -7,31 +7,42 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+// Base URL das suas APIs do Xano
+const BASE_AUTH_URL = "https://x8ki-letl-twmt.n7.xano.io/api:0_3C2_nU";
+const BASE_EXPENSE_URL = "https://x8ki-letl-twmt.n7.xano.io/api:agAjCmuq";
+
+// Função para requisições genéricas à API
 export async function apiRequest(
   method: string,
-  url: string,
-  data?: unknown | undefined,
+  endpoint: string,
+  data?: unknown
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const baseUrl = endpoint.startsWith("/auth")
+    ? BASE_AUTH_URL
+    : BASE_EXPENSE_URL;
+
+  const res = await fetch(`${baseUrl}${endpoint}`, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
   return res;
 }
 
+// Função padrão para buscas (queries)
 type UnauthorizedBehavior = "returnNull" | "throw";
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+    const [base, endpoint] = queryKey as [string, string];
+    const baseUrl = base === "auth" ? BASE_AUTH_URL : BASE_EXPENSE_URL;
+
+    const res = await fetch(`${baseUrl}${endpoint}`);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
@@ -41,6 +52,7 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Configuração padrão do React Query
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
