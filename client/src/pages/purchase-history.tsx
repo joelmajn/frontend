@@ -15,12 +15,13 @@ export default function PurchaseHistory() {
   const [selectedBank, setSelectedBank] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
+  // Usando as keys corretas para integrar com apiRequest
   const { data: cards = [] } = useQuery<CardType[]>({
-    queryKey: ["/api/cards"],
+    queryKey: ["expenses", "/card"],
   });
 
   const { data: allPurchases = [] } = useQuery<(Purchase & { card: CardType })[]>({
-    queryKey: ["/api/purchases"],
+    queryKey: ["expenses", "/purchase"],
   });
 
   const filteredPurchases = allPurchases.filter((purchase) => {
@@ -51,12 +52,10 @@ export default function PurchaseHistory() {
     outros: "Outros",
   };
 
-  // Get unique months from purchases
   const availableMonths = Array.from(
     new Set(allPurchases.map((p) => p.invoiceMonth))
   ).sort().reverse();
 
-  // Get unique categories
   const availableCategories = Array.from(
     new Set(allPurchases.map((p) => p.category))
   );
@@ -87,7 +86,7 @@ export default function PurchaseHistory() {
               </h2>
             </div>
 
-            {/* Filters */}
+            {/* Filtros */}
             <div className="grid md:grid-cols-3 gap-4 mb-6">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                 <SelectTrigger>
@@ -135,7 +134,7 @@ export default function PurchaseHistory() {
               </Select>
             </div>
 
-            {/* Purchase List */}
+            {/* Lista de compras */}
             <div className="space-y-4">
               {filteredPurchases.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">

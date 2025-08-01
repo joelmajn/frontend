@@ -57,13 +57,9 @@ export default function InvoiceHistoryPage() {
     
     // Get purchases for this month, handling installments correctly
     const monthPurchases = allPurchases.filter(purchase => {
-      const purchaseDate = new Date(purchase.purchaseDate);
-      const card = purchase.card;
-      
-      // Calculate all months this purchase affects
+      // Calculate all months this purchase affects (parcelas)
       const invoiceMonths = [];
       for (let installment = 0; installment < purchase.totalInstallments; installment++) {
-        // Calculate the invoice month for each installment
         const baseInvoiceDate = parse(purchase.invoiceMonth, 'yyyy-MM', new Date());
         const installmentInvoiceDate = addMonths(baseInvoiceDate, installment);
         const installmentMonth = format(installmentInvoiceDate, 'yyyy-MM');
@@ -73,7 +69,7 @@ export default function InvoiceHistoryPage() {
       return invoiceMonths.includes(monthKey);
     });
 
-    // Calculate total value for this month (sum of installment values)
+    // Sum do valor das parcelas para o mês
     const totalValue = monthPurchases.reduce((sum, purchase) => {
       return sum + parseFloat(purchase.installmentValue);
     }, 0);
@@ -86,7 +82,7 @@ export default function InvoiceHistoryPage() {
     });
   }
 
-  // Reverse to show most recent months first
+  // Mostrar meses mais recentes primeiro
   monthsData.reverse();
 
   const getCategoryColor = (category: string) => {
@@ -138,7 +134,7 @@ export default function InvoiceHistoryPage() {
                 Histórico de Faturas
               </h2>
               
-              {/* Year Navigation */}
+              {/* Navegação entre anos */}
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
