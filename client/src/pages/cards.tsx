@@ -1,24 +1,24 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/api"; // Ajuste o caminho conforme seu projeto
+import { queryClient, apiRequest } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast"; // Ajuste se necessário
+import { toast } from "@/components/ui/use-toast";
 import type { Card as CardType } from "@shared/schema";
 
 export default function Cards() {
-  // Busca os cartões usando o getQueryFn padrão do queryClient
   const { data: cards = [], isLoading } = useQuery<CardType[]>({
-    queryKey: ["expenses", "/card"],
+    queryKey: ["expenses", "/cards"], // plural /cards
   });
 
   const deleteCardMutation = useMutation({
     mutationFn: async (cardId: string) => {
+      // endpoint ajustado para /card/:id
       const res = await apiRequest("DELETE", `/card/${cardId}`);
-      return res.json();
+      return res; // apiRequest já retorna JSON
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses", "/card"] });
-      queryClient.invalidateQueries({ queryKey: ["expenses", "/purchase"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses", "/cards"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses", "/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["expenses", "/monthly_invoice"] });
       toast({
         title: "Sucesso",
