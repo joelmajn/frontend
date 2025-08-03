@@ -76,15 +76,9 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
-  const { data: cards = [], isLoading: cardsLoading, error: cardsError } = useQuery<Card[]>({
+  const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
-
-  // Debug logs
-  console.log("Cards loading:", cardsLoading);
-  console.log("Cards error:", cardsError);
-  console.log("Cards data:", cards);
-  console.log("Form cardId value:", form.watch("cardId"));
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -286,23 +280,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
           <DialogTitle>Registrar Nova Compra</DialogTitle>
         </DialogHeader>
 
-        {/* Debug Information */}
-        <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
-          <div><strong>Debug Info:</strong></div>
-          <div>Cards loading: {cardsLoading ? "Sim" : "Não"}</div>
-          <div>Cards count: {cards?.length || 0}</div>
-          <div>Selected cardId: {form.watch("cardId") || "Nenhum"}</div>
-          {cardsError && <div className="text-red-600">Error: {String(cardsError)}</div>}
-          {cards?.length > 0 && (
-            <div>
-              <div>Cards disponíveis:</div>
-              {cards.map(card => (
-                <div key={card.id} className="ml-2">- {card.id}: {card.bankName}</div>
-              ))}
-            </div>
-          )}
-        </div>
-
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -311,38 +288,29 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cartão</FormLabel>
-                  <Select 
-                    onValueChange={(value) => {
-                      console.log("Card selected - value:", value);
-                      console.log("Available cards:", cards);
-                      field.onChange(value);
-                    }} 
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o cartão" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {cardsLoading ? (
-                        <SelectItem value="loading" disabled>
-                          Carregando cartões...
-                        </SelectItem>
-                      ) : cards.length === 0 ? (
-                        <SelectItem value="no-cards" disabled>
-                          Nenhum cartão encontrado
-                        </SelectItem>
-                      ) : (
-                        cards.map((card) => (
-                          <SelectItem key={card.id} value={card.id}>
-                            {card.bankName}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  {/* CORREÇÃO: Removido o Select complexo e substituído por select nativo */}
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecione o cartão</option>
+                      {cards.map((card) => (
+                        <option key={card.id} value={card.id}>
+                          {card.bankName}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
                   <FormMessage />
+                  {/* Visual feedback for selected card */}
+                  {field.value && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <p className="text-sm text-green-800">
+                        ✓ Cartão selecionado: {cards.find(c => c.id === field.value)?.bankName}
+                      </p>
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
@@ -393,20 +361,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                       Gerenciar
                     </Button>
                   </div>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a categoria" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <option value="">Selecione a categoria</option>
                       {customCategories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
+                        <option key={category.value} value={category.value}>
                           {category.label}
-                        </SelectItem>
+                        </option>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </select>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -473,20 +440,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Mês da Fatura</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o mês da fatura" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
+                    <FormControl>
+                      <select
+                        {...field}
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <option value="">Selecione o mês da fatura</option>
                         {availableMonths.map((month) => (
-                          <SelectItem key={month.value} value={month.value}>
+                          <option key={month.value} value={month.value}>
                             {month.label}
-                          </SelectItem>
+                          </option>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </select>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
