@@ -76,12 +76,15 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
-  const { data: cards = [] } = useQuery<Card[]>({
+  const { data: cards = [], isLoading: cardsLoading, error: cardsError } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
 
-  // Watch for cardId changes to ensure it stays selected
-  const selectedCardId = form.watch("cardId");
+  // Debug logs
+  console.log("Cards loading:", cardsLoading);
+  console.log("Cards error:", cardsError);
+  console.log("Cards data:", cards);
+  console.log("Form cardId value:", form.watch("cardId"));
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -276,15 +279,29 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     createPurchaseMutation.mutate(data);
   };
 
-  // Get selected card for display
-  const selectedCard = cards.find(card => card.id === selectedCardId);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar Nova Compra</DialogTitle>
         </DialogHeader>
+
+        {/* Debug Information */}
+        <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+          <div><strong>Debug Info:</strong></div>
+          <div>Cards loading: {cardsLoading ? "Sim" : "Não"}</div>
+          <div>Cards count: {cards?.length || 0}</div>
+          <div>Selected cardId: {form.watch("cardId") || "Nenhum"}</div>
+          {cardsError && <div className="text-red-600">Error: {String(cardsError)}</div>}
+          {cards?.length > 0 && (
+            <div>
+              <div>Cards disponíveis:</div>
+              {cards.map(card => (
+                <div key={card.id} className="ml-2">- {card.id}: {card.bankName}</div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -296,38 +313,36 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                   <FormLabel>Cartão</FormLabel>
                   <Select 
                     onValueChange={(value) => {
-                      console.log("Card selected:", value);
+                      console.log("Card selected - value:", value);
+                      console.log("Available cards:", cards);
                       field.onChange(value);
                     }} 
                     value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o cartão">
-                          {selectedCard ? selectedCard.bankName : "Selecione o cartão"}
-                        </SelectValue>
+                        <SelectValue placeholder="Selecione o cartão" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {cards.map((card) => (
-                        <SelectItem key={card.id} value={card.id}>
-                          {card.bankName}
+                      {cardsLoading ? (
+                        <SelectItem value="loading" disabled>
+                          Carregando cartões...
                         </SelectItem>
-                      ))}
+                      ) : cards.length === 0 ? (
+                        <SelectItem value="no-cards" disabled>
+                          Nenhum cartão encontrado
+                        </SelectItem>
+                      ) : (
+                        cards.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            {card.bankName}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                  {/* Display selected card info */}
-                  {selectedCard && (
-                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                        ✓ Cartão selecionado: {selectedCard.bankName}
-                      </p>
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
-                        Fechamento dia {selectedCard.closingDay}
-                      </p>
-                    </div>
-                  )}
                 </FormItem>
               )}
             />
