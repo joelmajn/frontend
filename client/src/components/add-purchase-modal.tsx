@@ -76,30 +76,22 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
-  // Debug: Log form values
-  console.log("Form values:", form.watch());
-
   // Reset form only when modal closes, not when it opens
   useEffect(() => {
     if (!isOpen) {
       // Only reset when modal is closed
       const timer = setTimeout(() => {
-        console.log("Resetting form because modal closed");
         form.reset();
         setUseManualMonth(false);
       }, 300); // Small delay to avoid visual glitch
       
       return () => clearTimeout(timer);
-    } else {
-      console.log("Modal opened, not resetting form");
     }
   }, [isOpen, form]);
 
   const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
-
-  console.log("Available cards:", cards);
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -302,19 +294,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="cardId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cartão</FormLabel>
-                  <Select 
-                    onValueChange={(value) => { 
-                      console.log('Selected cardId:', value); 
-                      field.onChange(value); 
-                    }} 
-                    value={field.value}
-                  >
+                  <Select onValueChange={(value) => { console.log('Selected cardId:', value); field.onChange(value); }} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o cartão" />
@@ -470,5 +450,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                           <SelectItem key={month.value} value={month.value}>
                             {month.label}
                           </SelectItem>
-              
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Real-time invoice months preview */}
+            {invoiceMonthsPreview && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+             
 (Content truncated due to size limit. Use page ranges or line ranges to read remaining content)
