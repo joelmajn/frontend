@@ -76,9 +76,17 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
-  const { data: cards = [] } = useQuery<Card[]>({
+  const { data: cards = [], isLoading: cardsLoading, error: cardsError } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
+
+  // Debug logs
+  console.log("=== DEBUG XANO INTEGRATION ===");
+  console.log("Cards loading:", cardsLoading);
+  console.log("Cards error:", cardsError);
+  console.log("Cards data (raw):", cards);
+  console.log("Form cardId value:", form.watch("cardId"));
+  console.log("Selected card object:", cards.find(card => card.id === form.watch("cardId")));
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -133,21 +141,34 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      console.log("Criando compra:", data);
+      console.log("=== INICIANDO CRIAÇÃO DA COMPRA ===");
+      console.log("1. Dados do formulário recebidos:", data);
 
       const selectedCard = cards.find(card => card.id === data.cardId);
+      console.log("2. Cartão selecionado encontrado:", selectedCard);
+      
       if (!selectedCard) {
-        throw new Error("Cartão não encontrado");
+        console.error("❌ ERRO: Cartão não encontrado");
+        console.log("Available cards:", cards.map(c => ({ id: c.id, name: c.bankName })));
+        console.log("Looking for cardId:", data.cardId);
+        throw new Error("Cartão não encontrado. Verifique se o cartão ainda está disponível.");
       }
 
       // Calcular dados da compra
       const totalValue = parseFloat(data.totalValue);
       const installmentValue = totalValue / data.totalInstallments;
 
+      console.log("3. Valores calculados:", {
+        totalValue,
+        installmentValue,
+        totalInstallments: data.totalInstallments
+      });
+
       // Calcular mês da fatura
       let invoiceMonth: string;
       if (useManualMonth && data.manualInvoiceMonth) {
         invoiceMonth = data.manualInvoiceMonth;
+        console.log("4. Usando mês manual:", invoiceMonth);
       } else {
         const purchaseDate = new Date(data.purchaseDate);
         const closingDay = selectedCard.closingDay;
@@ -163,6 +184,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
           // Fica no mês atual
           invoiceMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
         }
+        console.log("4. Mês da fatura calculado automaticamente:", invoiceMonth);
       }
 
       // Preparar dados para envio
@@ -178,22 +200,33 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         invoiceMonth: invoiceMonth,
       };
 
-      console.log("Dados da compra preparados:", purchaseData);
+      console.log("5. Dados da compra preparados:", purchaseData);
 
       // Transformar para formato do Xano
       const xanoData = transformToXano(purchaseData);
+      console.log("6. Dados transformados para Xano:", xanoData);
 
-      console.log("Dados para Xano:", xanoData);
+      try {
+        console.log("7. Enviando requisição para o Xano...");
+        const response = await apiRequest("POST", "/api/purchases", xanoData);
+        const result = await response.json();
 
-      const response = await apiRequest("POST", "/api/purchases", xanoData);
-      const result = await response.json();
-
-      console.log("Resposta do Xano:", result);
-
-      return result;
+        console.log("8. ✅ Resposta do Xano:", result);
+        return result;
+      } catch (error) {
+        console.error("8. ❌ Erro na requisição para o Xano:", error);
+        
+        // Adicionar informações de debug do erro
+        if (error instanceof Error) {
+          console.error("Error message:", error.message);
+          console.error("Error stack:", error.stack);
+        }
+        
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      console.log("Compra criada com sucesso:", data);
+      console.log("✅ Compra criada com sucesso:", data);
 
       // Invalidar cache das queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
@@ -210,21 +243,38 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       onClose();
     },
     onError: (error) => {
-      console.error("Erro ao criar compra:", error);
+      console.error("❌ Erro ao criar compra:", error);
+
+      let errorMessage = "Erro desconhecido ao registrar compra";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Adicionar informações específicas para diferentes tipos de erro
+        if (errorMessage.includes("404")) {
+          errorMessage = "Cartão não encontrado no servidor. Verifique se o cartão ainda existe.";
+        } else if (errorMessage.includes("400")) {
+          errorMessage = "Dados inválidos enviados para o servidor.";
+        } else if (errorMessage.includes("500")) {
+          errorMessage = "Erro interno do servidor. Tente novamente em alguns minutos.";
+        }
+      }
 
       toast({
         title: "Erro",
-        description: `Erro ao registrar compra: ${error.message}`,
+        description: errorMessage,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("=== VALIDAÇÃO DO FORMULÁRIO ===");
     console.log("Dados do formulário:", data);
 
     // Validações
     if (!data.cardId) {
+      console.error("❌ Validação falhou: cardId vazio");
       toast({
         title: "Erro",
         description: "Selecione um cartão",
@@ -234,6 +284,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     }
 
     if (!data.name.trim()) {
+      console.error("❌ Validação falhou: nome vazio");
       toast({
         title: "Erro",
         description: "Nome da compra é obrigatório",
@@ -243,6 +294,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     }
 
     if (!data.category) {
+      console.error("❌ Validação falhou: categoria vazia");
       toast({
         title: "Erro",
         description: "Selecione uma categoria",
@@ -253,6 +305,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
     const totalValue = parseFloat(data.totalValue);
     if (isNaN(totalValue) || totalValue <= 0) {
+      console.error("❌ Validação falhou: valor inválido", data.totalValue);
       toast({
         title: "Erro",
         description: "Valor total deve ser maior que zero",
@@ -262,6 +315,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     }
 
     if (data.totalInstallments < 1 || data.totalInstallments > 99) {
+      console.error("❌ Validação falhou: parcelas inválidas", data.totalInstallments);
       toast({
         title: "Erro",
         description: "Número de parcelas deve ser entre 1 e 99",
@@ -270,6 +324,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       return;
     }
 
+    console.log("✅ Todas as validações passaram, enviando para mutation");
     createPurchaseMutation.mutate(data);
   };
 
@@ -280,6 +335,28 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
           <DialogTitle>Registrar Nova Compra</DialogTitle>
         </DialogHeader>
 
+        {/* Debug Information */}
+        <div className="mb-4 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs">
+          <div><strong>Debug Xano:</strong></div>
+          <div>Cards loading: {cardsLoading ? "Sim" : "Não"}</div>
+          <div>Cards count: {cards?.length || 0}</div>
+          <div>Selected cardId: {form.watch("cardId") || "Nenhum"}</div>
+          {cardsError && <div className="text-red-600">Error: {String(cardsError)}</div>}
+          {cards?.length > 0 && (
+            <div>
+              <div>Cards disponíveis:</div>
+              {cards.map(card => (
+                <div key={card.id} className="ml-2 text-xs">
+                  - ID: {card.id} | Nome: {card.bankName} | Tipo: {typeof card.id}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-2 text-blue-600">
+            Selected card: {JSON.stringify(cards.find(card => card.id === form.watch("cardId")), null, 2)}
+          </div>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -288,18 +365,28 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cartão</FormLabel>
-                  {/* CORREÇÃO: Removido o Select complexo e substituído por select nativo */}
                   <FormControl>
                     <select
                       {...field}
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onChange={(e) => {
+                        console.log("Card selection changed:", e.target.value);
+                        console.log("Available cards:", cards);
+                        field.onChange(e.target.value);
+                      }}
                     >
                       <option value="">Selecione o cartão</option>
-                      {cards.map((card) => (
-                        <option key={card.id} value={card.id}>
-                          {card.bankName}
-                        </option>
-                      ))}
+                      {cardsLoading ? (
+                        <option value="" disabled>Carregando cartões...</option>
+                      ) : cards.length === 0 ? (
+                        <option value="" disabled>Nenhum cartão encontrado</option>
+                      ) : (
+                        cards.map((card) => (
+                          <option key={card.id} value={card.id}>
+                            {card.bankName}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </FormControl>
                   <FormMessage />
@@ -308,6 +395,9 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
                       <p className="text-sm text-green-800">
                         ✓ Cartão selecionado: {cards.find(c => c.id === field.value)?.bankName}
+                      </p>
+                      <p className="text-xs text-green-600">
+                        ID: {field.value}
                       </p>
                     </div>
                   )}
@@ -364,7 +454,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                   <FormControl>
                     <select
                       {...field}
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     >
                       <option value="">Selecione a categoria</option>
                       {customCategories.map((category) => (
@@ -443,7 +533,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     <FormControl>
                       <select
                         {...field}
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
                         <option value="">Selecione o mês da fatura</option>
                         {availableMonths.map((month) => (
