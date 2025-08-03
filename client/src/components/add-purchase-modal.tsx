@@ -47,7 +47,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   const availableMonths = useMemo(() => {
     const months = [];
     const currentDate = new Date();
-    
+
     // Generate months from current month to next 24 months
     for (let i = 0; i < 24; i++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
@@ -58,7 +58,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         label: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
       });
     }
-    
+
     return months;
   }, []);
 
@@ -79,6 +79,9 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
+
+  // Watch for cardId changes to ensure it stays selected
+  const selectedCardId = form.watch("cardId");
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -134,7 +137,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log("Criando compra:", data);
-      
+
       const selectedCard = cards.find(card => card.id === data.cardId);
       if (!selectedCard) {
         throw new Error("Cartão não encontrado");
@@ -143,7 +146,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       // Calcular dados da compra
       const totalValue = parseFloat(data.totalValue);
       const installmentValue = totalValue / data.totalInstallments;
-      
+
       // Calcular mês da fatura
       let invoiceMonth: string;
       if (useManualMonth && data.manualInvoiceMonth) {
@@ -154,7 +157,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         const year = purchaseDate.getFullYear();
         const month = purchaseDate.getMonth();
         const day = purchaseDate.getDate();
-        
+
         if (day >= closingDay) {
           // Vai para próximo mês
           const nextMonth = new Date(year, month + 1, 1);
@@ -182,36 +185,36 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
       // Transformar para formato do Xano
       const xanoData = transformToXano(purchaseData);
-      
+
       console.log("Dados para Xano:", xanoData);
 
       const response = await apiRequest("POST", "/api/purchases", xanoData);
       const result = await response.json();
-      
+
       console.log("Resposta do Xano:", result);
-      
+
       return result;
     },
     onSuccess: (data) => {
       console.log("Compra criada com sucesso:", data);
-      
+
       // Invalidar cache das queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
-      
+
       toast({
         title: "Sucesso",
         description: "Compra registrada com sucesso!",
       });
-      
+
       form.reset();
       setUseManualMonth(false);
       onClose();
     },
     onError: (error) => {
       console.error("Erro ao criar compra:", error);
-      
+
       toast({
         title: "Erro",
         description: `Erro ao registrar compra: ${error.message}`,
@@ -222,7 +225,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
   const onSubmit = (data: FormData) => {
     console.log("Dados do formulário:", data);
-    
+
     // Validações
     if (!data.cardId) {
       toast({
@@ -232,16 +235,16 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       });
       return;
     }
-    
+
     if (!data.name.trim()) {
       toast({
-        title: "Erro", 
+        title: "Erro",
         description: "Nome da compra é obrigatório",
         variant: "destructive",
       });
       return;
     }
-    
+
     if (!data.category) {
       toast({
         title: "Erro",
@@ -250,7 +253,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       });
       return;
     }
-    
+
     const totalValue = parseFloat(data.totalValue);
     if (isNaN(totalValue) || totalValue <= 0) {
       toast({
@@ -260,7 +263,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       });
       return;
     }
-    
+
     if (data.totalInstallments < 1 || data.totalInstallments > 99) {
       toast({
         title: "Erro",
@@ -269,9 +272,12 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       });
       return;
     }
-    
+
     createPurchaseMutation.mutate(data);
   };
+
+  // Get selected card for display
+  const selectedCard = cards.find(card => card.id === selectedCardId);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -288,10 +294,18 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cartão</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => {
+                      console.log("Card selected:", value);
+                      field.onChange(value);
+                    }} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o cartão" />
+                        <SelectValue placeholder="Selecione o cartão">
+                          {selectedCard ? selectedCard.bankName : "Selecione o cartão"}
+                        </SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -303,6 +317,17 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                  {/* Display selected card info */}
+                  {selectedCard && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        ✓ Cartão selecionado: {selectedCard.bankName}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Fechamento dia {selectedCard.closingDay}
+                      </p>
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
@@ -418,11 +443,11 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                 id="useManualMonth"
                 checked={useManualMonth}
                 onChange={(e) => setUseManualMonth(e.target.checked)}
-                className="rounded border-gray-300 text-primary focus:ring-primary"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <Label htmlFor="useManualMonth" className="text-sm">
+              <label htmlFor="useManualMonth" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Selecionar mês da fatura manualmente
-              </Label>
+              </label>
             </div>
 
             {/* Manual month selection field */}
