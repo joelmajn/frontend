@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, transformToXano } from "@/lib/queryClient";
 import { insertCardSchema, type InsertCard } from "@shared/schema";
 
 interface AddCardModalProps {
@@ -30,35 +30,76 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
 
   const createCardMutation = useMutation({
     mutationFn: async (data: InsertCard) => {
+      console.log("Criando cartão:", data);
+      
       // Transformar dados para formato do Xano
-      const xanoData = {
-        bank_name: data.bankName,
-        logo_url: data.logoUrl || "",
-        closing_day: data.closingDay,
-        due_day: data.dueDay,
-      };
+      const xanoData = transformToXano(data);
+      
+      console.log("Dados para Xano:", xanoData);
+      
       const response = await apiRequest("POST", "/api/cards", xanoData);
-      return response.json();
+      const result = await response.json();
+      
+      console.log("Resposta do Xano:", result);
+      
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Cartão criado com sucesso:", data);
+      
+      // Invalidar cache das queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
+      
       toast({
         title: "Sucesso",
         description: "Cartão cadastrado com sucesso!",
       });
+      
       form.reset();
       onClose();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro ao criar cartão:", error);
+      
       toast({
         title: "Erro",
-        description: "Erro ao cadastrar cartão. Tente novamente.",
+        description: `Erro ao cadastrar cartão: ${error.message}`,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: InsertCard) => {
+    console.log("Dados do formulário:", data);
+    
+    // Validar dados antes de enviar
+    if (!data.bankName.trim()) {
+      toast({
+        title: "Erro",
+        description: "Nome do banco é obrigatório",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (data.closingDay < 1 || data.closingDay > 31) {
+      toast({
+        title: "Erro", 
+        description: "Dia de fechamento deve ser entre 1 e 31",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (data.dueDay < 1 || data.dueDay > 31) {
+      toast({
+        title: "Erro",
+        description: "Dia de vencimento deve ser entre 1 e 31", 
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createCardMutation.mutate(data);
   };
 
@@ -78,7 +119,29 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
                 <FormItem>
                   <FormLabel>Nome do Banco</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ex: Banco do Brasil" {...field} />
+                    <Input 
+                      placeholder="Ex: Banco do Brasil" 
+                      {...field} 
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="logoUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>URL do Logo (opcional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Ex: https://exemplo.com/logo.png" 
+                      {...field} 
+                      value={field.value || ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -98,6 +161,7 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
                       max="31"
                       placeholder="Ex: 14"
                       {...field}
+                      value={field.value || ""}
                       onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                     />
                   </FormControl>
@@ -119,6 +183,7 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
                       max="31"
                       placeholder="Ex: 21"
                       {...field}
+                      value={field.value || ""}
                       onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                     />
                   </FormControl>
@@ -133,6 +198,7 @@ export default function AddCardModal({ isOpen, onClose }: AddCardModalProps) {
                 variant="outline"
                 className="flex-1"
                 onClick={onClose}
+                disabled={createCardMutation.isPending}
               >
                 Cancelar
               </Button>

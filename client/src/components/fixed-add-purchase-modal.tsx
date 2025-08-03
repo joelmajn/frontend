@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, transformToXano } from "@/lib/queryClient";
 import { insertPurchaseSchema, type InsertPurchase, type Card } from "@shared/schema";
 import { calculateInstallmentMonths, formatMonthsForDisplay } from "@shared/invoice-calculator";
 import { z } from "zod";
@@ -132,9 +132,13 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   }, [form.watch("cardId"), form.watch("purchaseDate"), form.watch("totalInstallments"), form.watch("manualInvoiceMonth"), cards, useManualMonth]);
 
   const createPurchaseMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: FormData) => {
+      console.log("Criando compra:", data);
+      
       const selectedCard = cards.find(card => card.id === data.cardId);
-      if (!selectedCard) throw new Error("Cartão não encontrado");
+      if (!selectedCard) {
+        throw new Error("Cartão não encontrado");
+      }
 
       // Calcular dados da compra
       const totalValue = parseFloat(data.totalValue);
@@ -147,56 +151,127 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       } else {
         const purchaseDate = new Date(data.purchaseDate);
         const closingDay = selectedCard.closingDay;
-        if (purchaseDate.getDate() >= closingDay) {
-          const nextMonth = new Date(purchaseDate.getFullYear(), purchaseDate.getMonth() + 1, 1);
+        const year = purchaseDate.getFullYear();
+        const month = purchaseDate.getMonth();
+        const day = purchaseDate.getDate();
+        
+        if (day >= closingDay) {
+          // Vai para próximo mês
+          const nextMonth = new Date(year, month + 1, 1);
           invoiceMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
         } else {
-          invoiceMonth = `${purchaseDate.getFullYear()}-${String(purchaseDate.getMonth() + 1).padStart(2, '0')}`;
+          // Fica no mês atual
+          invoiceMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
         }
       }
 
-      // Transformar dados para formato do Xano
-      const xanoData = {
-        card_id: data.cardId,
-        purchase_date: data.purchaseDate,
+      // Preparar dados para envio
+      const purchaseData = {
+        cardId: data.cardId,
+        purchaseDate: data.purchaseDate,
         name: data.name,
         category: data.category,
-        total_value: totalValue,
-        total_installments: data.totalInstallments,
-        current_installment: 1,
-        installment_value: installmentValue,
-        invoice_month: invoiceMonth,
+        totalValue: totalValue.toString(),
+        totalInstallments: data.totalInstallments,
+        currentInstallment: 1,
+        installmentValue: installmentValue.toString(),
+        invoiceMonth: invoiceMonth,
       };
 
+      console.log("Dados da compra preparados:", purchaseData);
+
+      // Transformar para formato do Xano
+      const xanoData = transformToXano(purchaseData);
+      
+      console.log("Dados para Xano:", xanoData);
+
       const response = await apiRequest("POST", "/api/purchases", xanoData);
-      return response.json();
+      const result = await response.json();
+      
+      console.log("Resposta do Xano:", result);
+      
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Compra criada com sucesso:", data);
+      
+      // Invalidar cache das queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
+      
       toast({
         title: "Sucesso",
         description: "Compra registrada com sucesso!",
       });
+      
       form.reset();
       setUseManualMonth(false);
       onClose();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Erro ao criar compra:", error);
+      
       toast({
         title: "Erro",
-        description: "Erro ao registrar compra. Tente novamente.",
+        description: `Erro ao registrar compra: ${error.message}`,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("Dados do formulário:", data);
+    
+    // Validações
+    if (!data.cardId) {
+      toast({
+        title: "Erro",
+        description: "Selecione um cartão",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.name.trim()) {
+      toast({
+        title: "Erro", 
+        description: "Nome da compra é obrigatório",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!data.category) {
+      toast({
+        title: "Erro",
+        description: "Selecione uma categoria",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const totalValue = parseFloat(data.totalValue);
+    if (isNaN(totalValue) || totalValue <= 0) {
+      toast({
+        title: "Erro",
+        description: "Valor total deve ser maior que zero",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (data.totalInstallments < 1 || data.totalInstallments > 99) {
+      toast({
+        title: "Erro",
+        description: "Número de parcelas deve ser entre 1 e 99",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createPurchaseMutation.mutate(data);
   };
-
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -424,6 +499,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                 variant="outline"
                 className="flex-1"
                 onClick={onClose}
+                disabled={createPurchaseMutation.isPending}
               >
                 Cancelar
               </Button>
