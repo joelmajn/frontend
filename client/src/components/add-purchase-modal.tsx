@@ -76,22 +76,30 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
+  // Debug: Log form values
+  console.log("Form values:", form.watch());
+
   // Reset form only when modal closes, not when it opens
   useEffect(() => {
     if (!isOpen) {
       // Only reset when modal is closed
       const timer = setTimeout(() => {
+        console.log("Resetting form because modal closed");
         form.reset();
         setUseManualMonth(false);
       }, 300); // Small delay to avoid visual glitch
       
       return () => clearTimeout(timer);
+    } else {
+      console.log("Modal opened, not resetting form");
     }
   }, [isOpen, form]);
 
   const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
   });
+
+  console.log("Available cards:", cards);
 
   // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
@@ -300,7 +308,13 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cartão</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(value) => { 
+                      console.log('Selected cardId:', value); 
+                      field.onChange(value); 
+                    }} 
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o cartão" />
@@ -456,84 +470,5 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                           <SelectItem key={month.value} value={month.value}>
                             {month.label}
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Real-time invoice months preview */}
-            {invoiceMonthsPreview && (
-              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Previsão das Parcelas
-                  </span>
-                </div>
-                <div className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  {invoiceMonthsPreview.isManual 
-                    ? "Mês da fatura selecionado manualmente" 
-                    : invoiceMonthsPreview.isNextMonth 
-                      ? "Compra após o fechamento - vai para a próxima fatura"
-                      : "Compra antes do fechamento - entra na fatura atual"
-                  }
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {invoiceMonthsPreview.allMonths.map((month, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="secondary" 
-                      className={`text-xs ${
-                        invoiceMonthsPreview.isManual 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      }`}
-                    >
-                      {index + 1}ª: {month}
-                    </Badge>
-                  ))}
-                </div>
-                {invoiceMonthsPreview.allMonths.length > 1 && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Total: {invoiceMonthsPreview.allMonths.length} parcelas distribuídas
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={onClose}
-                disabled={createPurchaseMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-primary hover:bg-blue-700"
-                disabled={createPurchaseMutation.isPending}
-              >
-                {createPurchaseMutation.isPending ? "Salvando..." : "Salvar Compra"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-
-      <CategoryManager
-        isOpen={isCategoryManagerOpen}
-        onClose={() => setIsCategoryManagerOpen(false)}
-        categories={customCategories}
-        onCategoriesChange={setCustomCategories}
-      />
-    </Dialog>
-  );
-}
-
+              
+(Content truncated due to size limit. Use page ranges or line ranges to read remaining content)
