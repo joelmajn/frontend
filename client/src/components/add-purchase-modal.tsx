@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,6 +75,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       manualInvoiceMonth: "",
     },
   });
+
+  // Reset form only when modal closes, not when it opens
+  useEffect(() => {
+    if (!isOpen) {
+      // Only reset when modal is closed
+      const timer = setTimeout(() => {
+        form.reset();
+        setUseManualMonth(false);
+      }, 300); // Small delay to avoid visual glitch
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, form]);
 
   const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
@@ -205,8 +218,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         description: "Compra registrada com sucesso!",
       });
       
-      form.reset();
-      setUseManualMonth(false);
+      // Don't reset here - let the useEffect handle it when modal closes
       onClose();
     },
     onError: (error) => {
@@ -524,3 +536,4 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     </Dialog>
   );
 }
+
