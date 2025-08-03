@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -75,19 +75,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       manualInvoiceMonth: "",
     },
   });
-
-  // Reset form only when modal closes, not when it opens
-  useEffect(() => {
-    if (!isOpen) {
-      // Only reset when modal is closed
-      const timer = setTimeout(() => {
-        form.reset();
-        setUseManualMonth(false);
-      }, 300); // Small delay to avoid visual glitch
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, form]);
 
   const { data: cards = [] } = useQuery<Card[]>({
     queryKey: ["/api/cards"],
@@ -218,7 +205,8 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         description: "Compra registrada com sucesso!",
       });
       
-      // Don't reset here - let the useEffect handle it when modal closes
+      form.reset();
+      setUseManualMonth(false);
       onClose();
     },
     onError: (error) => {
@@ -294,7 +282,13 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <Select onValueChange={(value) => { console.log('Selected cardId:', value); field.onChange(value); }} value={field.value}>
+            <FormField
+              control={form.control}
+              name="cardId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cartão</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o cartão" />
@@ -464,5 +458,69 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-             
-(Content truncated due to size limit. Use page ranges or line ranges to read remaining content)
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Previsão das Parcelas
+                  </span>
+                </div>
+                <div className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                  {invoiceMonthsPreview.isManual 
+                    ? "Mês da fatura selecionado manualmente" 
+                    : invoiceMonthsPreview.isNextMonth 
+                      ? "Compra após o fechamento - vai para a próxima fatura"
+                      : "Compra antes do fechamento - entra na fatura atual"
+                  }
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {invoiceMonthsPreview.allMonths.map((month, index) => (
+                    <Badge 
+                      key={index} 
+                      variant="secondary" 
+                      className={`text-xs ${
+                        invoiceMonthsPreview.isManual 
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                      }`}
+                    >
+                      {index + 1}ª: {month}
+                    </Badge>
+                  ))}
+                </div>
+                {invoiceMonthsPreview.allMonths.length > 1 && (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    Total: {invoiceMonthsPreview.allMonths.length} parcelas distribuídas
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+                disabled={createPurchaseMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-primary hover:bg-blue-700"
+                disabled={createPurchaseMutation.isPending}
+              >
+                {createPurchaseMutation.isPending ? "Salvando..." : "Salvar Compra"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+
+      <CategoryManager
+        isOpen={isCategoryManagerOpen}
+        onClose={() => setIsCategoryManagerOpen(false)}
+        categories={customCategories}
+        onCategoriesChange={setCustomCategories}
+      />
+    </Dialog>
+  );
+}
