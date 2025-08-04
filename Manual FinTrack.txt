@@ -1,0 +1,350 @@
+# 📱 Manual Completo - App de Controle de Finanças
+
+## 🎯 Visão Geral
+
+O **App de Controle de Finanças** é uma ferramenta completa para gerenciar cartões de crédito, compras e faturas mensais. O sistema calcula automaticamente em qual fatura cada compra será cobrada, considerando datas de fechamento e parcelas.
+
+---
+
+## 🚀 Acesso ao Sistema
+
+**URL**: [frontend-2dql.vercel.app](https://frontend-2dql.vercel.app)
+
+---
+
+## 📋 Funcionalidades Principais
+
+### ✅ Gerenciamento de Cartões
+- Cadastro de cartões de crédito
+- Definição de datas de fechamento e vencimento
+- Visualização de todos os cartões cadastrados
+
+### ✅ Controle de Compras
+- Registro de compras com parcelas
+- Cálculo automático da fatura de cobrança
+- Categorização de gastos
+- Previsão de parcelas futuras
+
+### ✅ Dashboard Inteligente
+- Resumo da fatura do mês atual
+- Compras recentes
+- Totais por cartão
+- Navegação rápida
+
+### ✅ Histórico Completo
+- Visualização de faturas por mês/ano
+- Histórico de todas as compras
+- Filtros por cartão e categoria
+
+---
+
+## 🏠 1. Dashboard (Página Inicial)
+
+### **Resumo do Mês Atual**
+- **Total Geral**: Soma de todas as faturas do mês
+- **Por Cartão**: Valor individual de cada cartão
+- **Data de Vencimento**: Quando pagar cada fatura
+
+### **Compras Recentes**
+- **Últimas 5 compras** realizadas
+- **Informações**: Nome, data, cartão, parcelas
+- **Valores**: Total da compra e valor da parcela
+
+### **Ações Rápidas**
+- **Botão "Nova Compra"**: Registrar compra rapidamente
+- **Botão "Novo Cartão"**: Cadastrar cartão
+- **Botão Flutuante (+)**: Acesso rápido a nova compra
+
+---
+
+## 💳 2. Cadastro de Cartões
+
+### **Como Cadastrar um Cartão:**
+
+1. **Acesse**: Dashboard → "Novo Cartão" OU Menu → "Cartões Registrados" → "+ Novo Cartão"
+
+2. **Preencha os dados**:
+   - **Nome do Banco**: Ex: "Banco do Brasil", "Nubank", "Inter"
+   - **URL do Logo** (opcional): Link para imagem do banco
+   - **Dia de Fechamento**: Dia que a fatura fecha (1-31)
+   - **Dia de Vencimento**: Dia que a fatura vence (1-31)
+
+3. **Exemplo de configuração**:
+   ```
+   Nome do Banco: Nubank
+   Dia de Fechamento: 14
+   Dia de Vencimento: 21
+   ```
+
+4. **Clique em "Salvar Cartão"**
+
+### **⚠️ Importante sobre as Datas:**
+- **Fechamento dia 14**: Compras de 15 do mês anterior até 14 do mês atual
+- **Vencimento dia 21**: Data limite para pagamento
+- **Exemplo**: Compra no dia 10/08 (antes do fechamento dia 14) → Fatura de agosto
+- **Exemplo**: Compra no dia 16/08 (após o fechamento dia 14) → Fatura de setembro
+
+---
+
+## 🛒 3. Registro de Compras
+
+### **Como Registrar uma Compra:**
+
+1. **Acesse**: Dashboard → "Nova Compra" OU Botão flutuante (+)
+
+2. **Preencha os dados**:
+
+   **📋 Informações Básicas**:
+   - **Cartão**: Selecione o cartão usado
+   - **Data da Compra**: Quando foi realizada
+   - **Nome da Compra**: Ex: "Supermercado", "Gasolina", "Netflix"
+   - **Categoria**: Alimentação, Combustível, etc.
+
+   **💰 Valores**:
+   - **Valor Total**: Preço total da compra
+   - **Número de Parcelas**: De 1 a 99 parcelas
+
+3. **🔄 Opções Avançadas**:
+   
+   **Seleção Manual do Mês**:
+   - ✅ Marque "Selecionar mês da fatura manualmente"
+   - Escolha em qual mês a compra deve aparecer
+   - Útil para ajustes específicos
+
+4. **📊 Previsão em Tempo Real**:
+   - O sistema mostra automaticamente em quais meses as parcelas aparecerão
+   - Indica se a compra vai para fatura atual ou próxima
+
+### **Exemplo Prático:**
+
+```
+Cartão: Nubank (fecha dia 14)
+Data: 10/08/2025 (antes do fechamento)
+Nome: Compra no Mercado
+Categoria: Alimentação
+Valor: R$ 300,00
+Parcelas: 3x
+
+Resultado:
+→ Agosto: R$ 100,00 (1ª parcela)
+→ Setembro: R$ 100,00 (2ª parcela)  
+→ Outubro: R$ 100,00 (3ª parcela)
+```
+
+---
+
+## 📊 4. Categorias de Gastos
+
+### **Categorias Padrão:**
+- 🍽️ **Alimentação**: Supermercado, restaurantes
+- 🔌 **Eletrônicos**: Celular, computador, TV
+- ⛽ **Combustível**: Gasolina, etanol
+- 👕 **Vestuário**: Roupas, sapatos
+- 🏥 **Saúde**: Médicos, farmácia, plano de saúde
+- 📦 **Outros**: Demais gastos
+
+### **Gerenciar Categorias:**
+1. **Durante o cadastro** de compra → "Gerenciar"
+2. **Adicione** novas categorias personalizadas
+3. **Exclua** categorias criadas (não remove as padrão)
+
+---
+
+## 📅 5. Histórico de Faturas
+
+### **Navegação por Meses:**
+1. **Acesse**: Dashboard → "Ver todos os meses"
+2. **Navegue** entre anos usando as setas ← →
+3. **Visualize** cada mês do ano selecionado
+
+### **Informações por Mês:**
+- **Total do Mês**: Soma de todas as faturas
+- **Número de Compras**: Quantas compras afetam o mês
+- **Detalhes**: Nome, valor, cartão, categoria de cada compra
+
+### **🔍 Cores e Indicadores:**
+- **Azul**: Meses com gastos
+- **Cinza**: Meses sem gastos
+- **Badges**: Número de compras no mês
+
+---
+
+## 📋 6. Histórico de Compras
+
+### **Visualização Completa:**
+1. **Acesse**: Menu → "Compras Registradas"
+2. **Veja** todas as compras já realizadas
+
+### **🔽 Filtros Disponíveis:**
+- **Por Banco**: Mostrar apenas um cartão específico
+- **Por Categoria**: Filtrar por tipo de gasto
+
+### **📝 Informações Mostradas:**
+- **Nome e Categoria** da compra
+- **Data** da compra
+- **Cartão** utilizado
+- **Parcelas**: Atual/Total (Ex: 2/5)
+- **Mês da Fatura**: Quando será cobrada
+- **Valores**: Total e valor da parcela
+
+### **🗑️ Ações:**
+- **Excluir Compra**: Botão de lixeira (⚠️ ação irreversível)
+
+---
+
+## 🧮 7. Como o Sistema Calcula as Faturas
+
+### **Lógica de Fechamento:**
+
+**Exemplo com cartão que fecha dia 14:**
+
+```
+Período da Fatura de Agosto:
+├─ 15/07 até 14/08 → Fatura de Agosto
+└─ 15/08 até 14/09 → Fatura de Setembro
+
+Compras:
+• 10/08 (antes do dia 14) → Fatura de Agosto
+• 16/08 (após o dia 14) → Fatura de Setembro
+```
+
+### **Parcelas Distribuídas:**
+
+```
+Compra: R$ 600 em 3x no dia 10/08
+└─ Agosto: R$ 200 (1ª parcela)
+└─ Setembro: R$ 200 (2ª parcela)
+└─ Outubro: R$ 200 (3ª parcela)
+```
+
+### **Atualização Automática:**
+
+- **Todo dia 1º**: Sistema atualiza para o novo mês
+- **Parcelas futuras**: Aparecem automaticamente nos meses corretos
+- **Dashboard**: Sempre mostra o mês atual
+
+---
+
+## 🔧 8. Dicas de Uso
+
+### **📱 Uso Diário:**
+1. **Sempre registre** compras no mesmo dia
+2. **Use categorias** para controlar onde você gasta mais
+3. **Consulte o dashboard** para acompanhar o mês atual
+
+### **📊 Controle Mensal:**
+1. **Início do mês**: Veja as faturas que vencem
+2. **Durante o mês**: Acompanhe o acúmulo de gastos
+3. **Final do mês**: Analise o histórico para planejar
+
+### **💡 Boas Práticas:**
+- ✅ **Cadastre cartões** com datas corretas
+- ✅ **Registre compras** no dia que fez
+- ✅ **Use categorias** consistentes
+- ✅ **Revise** periodicamente o histórico
+- ✅ **Mantenha backup** dos dados importantes
+
+### **⚠️ Atenção:**
+- **Excluir cartão**: Remove todas as compras associadas
+- **Excluir compra**: Ação irreversível
+- **Datas incorretas**: Podem afetar o cálculo das faturas
+
+---
+
+## 🚨 9. Solução de Problemas
+
+### **❌ Compra não aparece no dashboard:**
+- Verifique se a data de fechamento do cartão está correta
+- Confirme se a compra afeta o mês atual
+- Recarregue a página
+
+### **❌ Valor incorreto na fatura:**
+- Verifique se todas as compras foram registradas
+- Confirme se as parcelas estão corretas
+- Revise compras de meses anteriores que ainda têm parcelas
+
+### **❌ Cartão não aparece na lista:**
+- Verifique se foi salvo corretamente
+- Recarregue a página
+- Tente cadastrar novamente
+
+### **🔄 Página branca ou erro:**
+- Recarregue a página (F5)
+- Limpe o cache do navegador
+- Tente em outro navegador
+
+---
+
+## 📱 10. Navegação do App
+
+### **🧭 Menu Principal:**
+- **Dashboard**: Página inicial com resumo
+- **Cartões Registrados**: Gerenciar cartões
+- **Compras Registradas**: Histórico completo
+- **Histórico de Faturas**: Navegação por meses
+
+### **🔄 Navegação Rápida:**
+- **Setas ← →**: Voltar/Avançar
+- **Botões azuis**: Ações principais
+- **Menu hambúrguer**: Acesso a todas as páginas
+
+---
+
+## 🎯 11. Cenários de Uso
+
+### **👤 Usuário Iniciante:**
+1. Cadastre seus cartões de crédito
+2. Registre algumas compras recentes
+3. Explore o dashboard para entender os totais
+4. Use o histórico para ver como as parcelas se distribuem
+
+### **📊 Controle Avançado:**
+1. Use categorias para identificar padrões de gasto
+2. Acompanhe mensalmente o crescimento das faturas
+3. Planeje compras grandes considerando as datas de fechamento
+4. Use a seleção manual de mês para ajustes específicos
+
+### **💰 Planejamento Financeiro:**
+1. Veja no histórico seus maiores gastos
+2. Use as categorias para identificar onde cortar
+3. Planeje compras parceladas para distribuir o impacto
+4. Acompanhe o total mensal para não extrapolar o orçamento
+
+---
+
+## ✅ 12. Checklist de Configuração Inicial
+
+### **🚀 Primeiros Passos:**
+- [ ] Acesse o app em frontend-2dql.vercel.app
+- [ ] Cadastre todos os seus cartões de crédito
+- [ ] Verifique se as datas de fechamento/vencimento estão corretas
+- [ ] Registre compras recentes (últimos 30 dias)
+- [ ] Explore o dashboard e histórico
+- [ ] Teste as categorias e filtros
+
+### **📋 Manutenção Regular:**
+- [ ] Registre compras no mesmo dia
+- [ ] Revise o dashboard semanalmente
+- [ ] Confira o histórico mensalmente
+- [ ] Mantenha as categorias organizadas
+- [ ] Backup periódico dos dados importantes
+
+---
+
+## 🎯 Conclusão
+
+O **App de Controle de Finanças** automatiza o controle de cartões de crédito, calculando precisamente em qual fatura cada compra será cobrada. Com interface intuitiva e cálculos automáticos, você mantém o controle total dos seus gastos sem complicação.
+
+**🌟 Principais Benefícios:**
+- ✅ **Controle total** das faturas mensais
+- ✅ **Cálculo automático** de parcelas e datas
+- ✅ **Histórico completo** para análise
+- ✅ **Categorização** para identificar padrões
+- ✅ **Interface simples** e intuitiva
+
+**📞 Suporte:**
+Para dúvidas ou problemas, verifique este manual ou reporte issues técnicas.
+
+---
+
+*Manual criado para a versão atual do sistema - Última atualização: Agosto 2025*

@@ -27,11 +27,8 @@ export default function Dashboard() {
     queryKey: ["/api/purchases"],
   });
 
-  // CORREÇÃO: Calcular totais do mês atual diretamente das compras
+  // Calcular totais do mês atual diretamente das compras
   const monthlyInvoicesCalculated = useMemo(() => {
-    console.log("🧮 Calculando faturas do mês atual:", currentMonth);
-    console.log("📋 Todas as compras:", allPurchases);
-
     // Agrupar compras por cartão para o mês atual
     const currentMonthPurchases = allPurchases.filter(purchase => {
       // Calcular todos os meses que esta compra afeta (considerando parcelas)
@@ -46,8 +43,6 @@ export default function Dashboard() {
       
       return affectedMonths.includes(currentMonth);
     });
-
-    console.log("💳 Compras do mês atual:", currentMonthPurchases);
 
     // Agrupar por cartão
     const invoicesByCard = new Map();
@@ -71,10 +66,7 @@ export default function Dashboard() {
       invoice.purchases.push(purchase);
     });
 
-    const result = Array.from(invoicesByCard.values());
-    console.log("📊 Faturas calculadas:", result);
-    
-    return result;
+    return Array.from(invoicesByCard.values());
   }, [allPurchases, currentMonth]);
 
   // Calcular total geral do mês
@@ -138,13 +130,7 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-600">Total das Faturas</p>
               </div>
 
-              {/* Debug Info */}
-              <div className="mb-4 p-2 bg-blue-50 rounded text-xs">
-                <p><strong>Debug:</strong> Mês atual: {currentMonth}</p>
-                <p>Compras encontradas: {allPurchases.length}</p>
-                <p>Faturas calculadas: {monthlyInvoicesCalculated.length}</p>
-                <p>Total calculado: R$ {totalCurrentMonth.toFixed(2)}</p>
-              </div>
+
 
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {monthlyInvoicesCalculated.length === 0 ? (
