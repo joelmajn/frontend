@@ -48,14 +48,34 @@ export default function Dashboard() {
     const invoicesByCard = new Map();
 
     currentMonthPurchases.forEach(purchase => {
-      const cardId = purchase.card.id;
+      const cardId = purchase.card?.id || purchase.cardId;
       
       if (!invoicesByCard.has(cardId)) {
+        // Buscar dados completos do cartão
+        let cardData = purchase.card;
+        
+        // Se não tem dados do cartão na compra, buscar na lista de cartões
+        if (!cardData || !cardData.bankName) {
+          cardData = cards.find(card => String(card.id) === String(cardId));
+        }
+        
+        // Fallback se ainda não encontrou
+        if (!cardData) {
+          cardData = {
+            id: cardId,
+            bankName: `Cartão ${cardId}`,
+            logoUrl: "",
+            closingDay: 15,
+            dueDay: 20,
+            createdAt: new Date().toISOString()
+          };
+        }
+
         invoicesByCard.set(cardId, {
           id: `calc-${cardId}-${currentMonth}`,
           month: currentMonth,
           cardId: cardId,
-          card: purchase.card,
+          card: cardData,
           totalValue: 0,
           purchases: []
         });
@@ -67,7 +87,7 @@ export default function Dashboard() {
     });
 
     return Array.from(invoicesByCard.values());
-  }, [allPurchases, currentMonth]);
+  }, [allPurchases, currentMonth, cards]);
 
   // Calcular total geral do mês
   const totalCurrentMonth = monthlyInvoicesCalculated.reduce(
