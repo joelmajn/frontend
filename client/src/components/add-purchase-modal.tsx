@@ -80,13 +80,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     queryKey: ["/api/cards"],
   });
 
-  // Helper function to find card by ID (handles string/number conversion)
+  // CORREÇÃO: Função helper melhorada para encontrar cartão por ID
   const findCardById = (cardId: string | number) => {
     if (!cardId) return null;
     
-    // Convert to number for comparison since card IDs are numbers
-    const numericId = typeof cardId === 'string' ? parseInt(cardId, 10) : cardId;
-    return cards.find(card => card.id === numericId) || null;
+    console.log("Procurando cartão com ID:", cardId, "Tipo:", typeof cardId);
+    console.log("Cartões disponíveis:", cards.map(c => ({ id: c.id, type: typeof c.id, name: c.bankName })));
+    
+    // Converter ambos para string para comparação consistente
+    const searchId = String(cardId);
+    const found = cards.find(card => String(card.id) === searchId) || null;
+    
+    console.log("Cartão encontrado:", found);
+    return found;
   };
 
   // Real-time calculation of invoice months
@@ -142,25 +148,33 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      console.log("Criando compra:", data);
+      console.log("=== INÍCIO CRIAÇÃO COMPRA ===");
+      console.log("Dados do formulário:", data);
 
-      // CORREÇÃO: Usar a função helper para encontrar o cartão
+      // CORREÇÃO: Buscar cartão usando função corrigida
       const selectedCard = findCardById(data.cardId);
       if (!selectedCard) {
-        console.error("Cartão não encontrado. cardId:", data.cardId, "Available cards:", cards.map(c => ({ id: c.id, name: c.bankName })));
-        throw new Error("Cartão não encontrado");
+        console.error("ERRO: Cartão não encontrado!");
+        console.error("cardId procurado:", data.cardId);
+        console.error("Cartões disponíveis:", cards);
+        throw new Error("Cartão não encontrado. Verifique se o cartão foi selecionado corretamente.");
       }
 
-      console.log("Cartão encontrado:", selectedCard);
+      console.log("✅ Cartão encontrado:", selectedCard);
 
       // Calcular dados da compra
       const totalValue = parseFloat(data.totalValue);
+      if (isNaN(totalValue) || totalValue <= 0) {
+        throw new Error("Valor inválido");
+      }
+
       const installmentValue = totalValue / data.totalInstallments;
 
       // Calcular mês da fatura
       let invoiceMonth: string;
       if (useManualMonth && data.manualInvoiceMonth) {
         invoiceMonth = data.manualInvoiceMonth;
+        console.log("Usando mês manual:", invoiceMonth);
       } else {
         const purchaseDate = new Date(data.purchaseDate);
         const closingDay = selectedCard.closingDay;
@@ -176,11 +190,12 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
           // Fica no mês atual
           invoiceMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
         }
+        console.log("Mês calculado automaticamente:", invoiceMonth);
       }
 
-      // Preparar dados para envio - CORREÇÃO: Converter cardId para number
+      // CORREÇÃO: Usar o ID exato do cartão como retornado pela API
       const purchaseData = {
-        cardId: selectedCard.id, // Usar o ID numérico do cartão encontrado
+        cardId: selectedCard.id, // Manter o tipo original (string ou number)
         purchaseDate: data.purchaseDate,
         name: data.name,
         category: data.category,
@@ -195,18 +210,20 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
       // Transformar para formato do Xano
       const xanoData = transformToXano(purchaseData);
-
       console.log("Dados para Xano:", xanoData);
 
-      const response = await apiRequest("POST", "/api/purchases", xanoData);
-      const result = await response.json();
-
-      console.log("Resposta do Xano:", result);
-
-      return result;
+      try {
+        const response = await apiRequest("POST", "/api/purchases", xanoData);
+        const result = await response.json();
+        console.log("✅ Resposta do Xano:", result);
+        return result;
+      } catch (error) {
+        console.error("❌ Erro na API:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
-      console.log("Compra criada com sucesso:", data);
+      console.log("✅ Compra criada com sucesso:", data);
 
       // Invalidar cache das queries relacionadas
       queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
@@ -223,7 +240,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       onClose();
     },
     onError: (error) => {
-      console.error("Erro ao criar compra:", error);
+      console.error("❌ Erro ao criar compra:", error);
 
       toast({
         title: "Erro",
@@ -234,9 +251,10 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   });
 
   const onSubmit = (data: FormData) => {
+    console.log("=== SUBMIT INICIADO ===");
     console.log("Dados do formulário:", data);
 
-    // Validações
+    // Validações básicas
     if (!data.cardId) {
       toast({
         title: "Erro",
@@ -283,6 +301,18 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       return;
     }
 
+    // CORREÇÃO: Verificar se o cartão existe antes de prosseguir
+    const selectedCard = findCardById(data.cardId);
+    if (!selectedCard) {
+      toast({
+        title: "Erro",
+        description: "Cartão selecionado não foi encontrado. Tente selecionar novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log("✅ Validações passaram, iniciando criação...");
     createPurchaseMutation.mutate(data);
   };
 
@@ -311,7 +341,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     >
                       <option value="">Selecione o cartão</option>
                       {cards.map((card) => (
-                        <option key={card.id} value={card.id.toString()}>
+                        <option key={card.id} value={String(card.id)}>
                           {card.bankName}
                         </option>
                       ))}
