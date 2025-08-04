@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, addMonths, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,18 +23,72 @@ export default function Dashboard() {
     queryKey: ["/api/cards"],
   });
 
-  const { data: recentPurchases = [] } = useQuery<(Purchase & { card: CardType })[]>({
+  const { data: allPurchases = [] } = useQuery<(Purchase & { card: CardType })[]>({
     queryKey: ["/api/purchases"],
   });
 
-  const { data: monthlyInvoices = [] } = useQuery<any[]>({
-    queryKey: ["/api/invoices", currentMonth],
-  });
+  // CORREÇÃO: Calcular totais do mês atual diretamente das compras
+  const monthlyInvoicesCalculated = useMemo(() => {
+    console.log("🧮 Calculando faturas do mês atual:", currentMonth);
+    console.log("📋 Todas as compras:", allPurchases);
 
-  const totalCurrentMonth = monthlyInvoices.reduce(
-    (sum: number, invoice: any) => sum + parseFloat(invoice.totalValue),
+    // Agrupar compras por cartão para o mês atual
+    const currentMonthPurchases = allPurchases.filter(purchase => {
+      // Calcular todos os meses que esta compra afeta (considerando parcelas)
+      const affectedMonths = [];
+      const baseInvoiceDate = parse(purchase.invoiceMonth, 'yyyy-MM', new Date());
+      
+      for (let i = 0; i < purchase.totalInstallments; i++) {
+        const installmentDate = addMonths(baseInvoiceDate, i);
+        const monthKey = format(installmentDate, 'yyyy-MM');
+        affectedMonths.push(monthKey);
+      }
+      
+      return affectedMonths.includes(currentMonth);
+    });
+
+    console.log("💳 Compras do mês atual:", currentMonthPurchases);
+
+    // Agrupar por cartão
+    const invoicesByCard = new Map();
+
+    currentMonthPurchases.forEach(purchase => {
+      const cardId = purchase.card.id;
+      
+      if (!invoicesByCard.has(cardId)) {
+        invoicesByCard.set(cardId, {
+          id: `calc-${cardId}-${currentMonth}`,
+          month: currentMonth,
+          cardId: cardId,
+          card: purchase.card,
+          totalValue: 0,
+          purchases: []
+        });
+      }
+
+      const invoice = invoicesByCard.get(cardId);
+      invoice.totalValue += parseFloat(purchase.installmentValue);
+      invoice.purchases.push(purchase);
+    });
+
+    const result = Array.from(invoicesByCard.values());
+    console.log("📊 Faturas calculadas:", result);
+    
+    return result;
+  }, [allPurchases, currentMonth]);
+
+  // Calcular total geral do mês
+  const totalCurrentMonth = monthlyInvoicesCalculated.reduce(
+    (sum, invoice) => sum + invoice.totalValue,
     0
   );
+
+  // Pegar compras recentes (últimas 5)
+  const recentPurchases = useMemo(() => {
+    return allPurchases
+      .sort((a, b) => new Date(b.createdAt || b.purchaseDate).getTime() - new Date(a.createdAt || a.purchaseDate).getTime())
+      .slice(0, 5);
+  }, [allPurchases]);
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -64,6 +118,7 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+      
       <main className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Current Month Summary */}
         <section className="mb-8">
@@ -83,34 +138,53 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-600">Total das Faturas</p>
               </div>
 
+              {/* Debug Info */}
+              <div className="mb-4 p-2 bg-blue-50 rounded text-xs">
+                <p><strong>Debug:</strong> Mês atual: {currentMonth}</p>
+                <p>Compras encontradas: {allPurchases.length}</p>
+                <p>Faturas calculadas: {monthlyInvoicesCalculated.length}</p>
+                <p>Total calculado: R$ {totalCurrentMonth.toFixed(2)}</p>
+              </div>
+
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {monthlyInvoices.map((invoice: any, index: number) => (
-                  <Card
-                    key={invoice.id}
-                    className={`border-l-4 ${getCardColor(index)} bg-gray-50`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium text-secondary">
-                          {invoice.card.bankName}
-                        </h3>
-                        <div className={`w-8 h-8 ${getCardColor(index).replace('border-', 'bg-')} rounded-full flex items-center justify-center`}>
-                          <University className="h-4 w-4 text-white" />
+                {monthlyInvoicesCalculated.length === 0 ? (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg mb-2">Nenhuma fatura para este mês</p>
+                    <p className="text-sm">Adicione uma compra para começar a acompanhar suas faturas.</p>
+                  </div>
+                ) : (
+                  monthlyInvoicesCalculated.map((invoice, index) => (
+                    <Card
+                      key={invoice.id}
+                      className={`border-l-4 ${getCardColor(index)} bg-gray-50`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium text-secondary">
+                            {invoice.card.bankName}
+                          </h3>
+                          <div className={`w-8 h-8 ${getCardColor(index).replace('border-', 'bg-')} rounded-full flex items-center justify-center`}>
+                            <University className="h-4 w-4 text-white" />
+                          </div>
                         </div>
-                      </div>
-                      <p className="text-xl font-bold text-secondary">
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        }).format(parseFloat(invoice.totalValue))}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        Vencimento: {invoice.card.dueDay}/
-                        {format(new Date(), "MM/yyyy")}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <p className="text-xl font-bold text-secondary">
+                          {new Intl.NumberFormat("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          }).format(invoice.totalValue)}
+                        </p>
+                        <p className="text-xs text-gray-600 mb-2">
+                          Vencimento: {invoice.card.dueDay}/
+                          {format(new Date(), "MM/yyyy")}
+                        </p>
+                        <p className="text-xs text-blue-600">
+                          {invoice.purchases?.length || 0} compra(s) este mês
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -140,7 +214,7 @@ export default function Dashboard() {
                 <h2 className="text-xl font-medium text-secondary">
                   Compras Recentes
                 </h2>
-                <Link href="/history">
+                <Link href="/purchases">
                   <Button variant="ghost" className="text-primary hover:text-blue-700">
                     Ver Todas
                   </Button>
@@ -148,49 +222,57 @@ export default function Dashboard() {
               </div>
 
               <div className="space-y-3">
-                {recentPurchases.slice(0, 5).map((purchase) => (
-                  <div
-                    key={purchase.id}
-                    className="border-b border-gray-200 pb-3 last:border-b-0"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-secondary">
-                            {purchase.name}
-                          </h3>
-                          <Badge className={getCategoryColor(purchase.category)}>
-                            {purchase.category.charAt(0).toUpperCase() + 
-                             purchase.category.slice(1)}
-                          </Badge>
+                {recentPurchases.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg mb-2">Nenhuma compra registrada</p>
+                    <p className="text-sm">Adicione sua primeira compra para começar.</p>
+                  </div>
+                ) : (
+                  recentPurchases.map((purchase) => (
+                    <div
+                      key={purchase.id}
+                      className="border-b border-gray-200 pb-3 last:border-b-0"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-secondary">
+                              {purchase.name}
+                            </h3>
+                            <Badge className={getCategoryColor(purchase.category)}>
+                              {purchase.category.charAt(0).toUpperCase() + 
+                               purchase.category.slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <span>
+                              {format(new Date(purchase.purchaseDate), "dd/MM/yyyy")}
+                            </span>
+                            <span>{purchase.card.bankName}</span>
+                            <span>
+                              {purchase.currentInstallment}/{purchase.totalInstallments} parcelas
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span>
-                            {format(new Date(purchase.purchaseDate), "dd/MM/yyyy")}
-                          </span>
-                          <span>{purchase.card.bankName}</span>
-                          <span>
-                            {purchase.currentInstallment}/{purchase.totalInstallments} parcelas
-                          </span>
+                        <div className="text-right">
+                          <p className="font-bold text-secondary">
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(parseFloat(purchase.totalValue))}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(parseFloat(purchase.installmentValue))}/mês
+                          </p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-secondary">
-                          {new Intl.NumberFormat("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          }).format(parseFloat(purchase.totalValue))}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {new Intl.NumberFormat("pt-BR", {
-                            style: "currency",
-                            currency: "BRL",
-                          }).format(parseFloat(purchase.installmentValue))}/mês
-                        </p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>
@@ -243,6 +325,7 @@ export default function Dashboard() {
           </Card>
         </section>
       </main>
+      
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-30">
         <Button
@@ -253,6 +336,7 @@ export default function Dashboard() {
           <Plus className="h-6 w-6" />
         </Button>
       </div>
+      
       <AddPurchaseModal
         isOpen={isPurchaseModalOpen}
         onClose={() => setIsPurchaseModalOpen(false)}
