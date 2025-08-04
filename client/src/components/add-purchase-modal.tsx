@@ -48,7 +48,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     const months = [];
     const currentDate = new Date();
 
-    // Generate months from current month to next 24 months
     for (let i = 0; i < 24; i++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -80,22 +79,19 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     queryKey: ["/api/cards"],
   });
 
-  // CORREÇÃO: Função helper melhorada para encontrar cartão por ID
   const findCardById = (cardId: string | number) => {
     if (!cardId) return null;
     
-    console.log("Procurando cartão com ID:", cardId, "Tipo:", typeof cardId);
-    console.log("Cartões disponíveis:", cards.map(c => ({ id: c.id, type: typeof c.id, name: c.bankName })));
+    console.log("🔍 Procurando cartão com ID:", cardId, "Tipo:", typeof cardId);
+    console.log("📋 Cartões disponíveis:", cards.map(c => ({ id: c.id, type: typeof c.id, name: c.bankName })));
     
-    // Converter ambos para string para comparação consistente
     const searchId = String(cardId);
     const found = cards.find(card => String(card.id) === searchId) || null;
     
-    console.log("Cartão encontrado:", found);
+    console.log("✅ Cartão encontrado:", found);
     return found;
   };
 
-  // Real-time calculation of invoice months
   const invoiceMonthsPreview = useMemo(() => {
     const cardId = form.watch("cardId");
     const purchaseDate = form.watch("purchaseDate");
@@ -116,7 +112,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     let isNextMonth = false;
 
     if (useManualMonth && manualInvoiceMonth) {
-      // Use manual selection
       installmentMonths = [];
       const [year, month] = manualInvoiceMonth.split('-').map(Number);
       for (let i = 0; i < totalInstallments; i++) {
@@ -126,12 +121,10 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       }
       displayMonths = formatMonthsForDisplay(installmentMonths);
     } else if (purchaseDate) {
-      // Use automatic calculation based on card closing date
       const purchaseDateObj = new Date(purchaseDate);
       installmentMonths = calculateInstallmentMonths(purchaseDateObj, selectedCard.closingDay, totalInstallments);
       displayMonths = formatMonthsForDisplay(installmentMonths);
 
-      // Check if purchase goes to next month
       const closingDate = new Date(purchaseDateObj.getFullYear(), purchaseDateObj.getMonth(), selectedCard.closingDay);
       isNextMonth = purchaseDateObj >= closingDate;
     } else {
@@ -148,21 +141,17 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      console.log("=== INÍCIO CRIAÇÃO COMPRA ===");
-      console.log("Dados do formulário:", data);
+      console.log("🚀 === INÍCIO CRIAÇÃO COMPRA ===");
+      console.log("📝 Dados do formulário:", data);
 
-      // CORREÇÃO: Buscar cartão usando função corrigida
       const selectedCard = findCardById(data.cardId);
       if (!selectedCard) {
-        console.error("ERRO: Cartão não encontrado!");
-        console.error("cardId procurado:", data.cardId);
-        console.error("Cartões disponíveis:", cards);
-        throw new Error("Cartão não encontrado. Verifique se o cartão foi selecionado corretamente.");
+        console.error("❌ ERRO: Cartão não encontrado!");
+        throw new Error("Cartão não encontrado");
       }
 
       console.log("✅ Cartão encontrado:", selectedCard);
 
-      // Calcular dados da compra
       const totalValue = parseFloat(data.totalValue);
       if (isNaN(totalValue) || totalValue <= 0) {
         throw new Error("Valor inválido");
@@ -170,11 +159,9 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
 
       const installmentValue = totalValue / data.totalInstallments;
 
-      // Calcular mês da fatura
       let invoiceMonth: string;
       if (useManualMonth && data.manualInvoiceMonth) {
         invoiceMonth = data.manualInvoiceMonth;
-        console.log("Usando mês manual:", invoiceMonth);
       } else {
         const purchaseDate = new Date(data.purchaseDate);
         const closingDay = selectedCard.closingDay;
@@ -183,19 +170,15 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         const day = purchaseDate.getDate();
 
         if (day >= closingDay) {
-          // Vai para próximo mês
           const nextMonth = new Date(year, month + 1, 1);
           invoiceMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
         } else {
-          // Fica no mês atual
           invoiceMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
         }
-        console.log("Mês calculado automaticamente:", invoiceMonth);
       }
 
-      // CORREÇÃO: Usar o ID exato do cartão como retornado pela API
       const purchaseData = {
-        cardId: selectedCard.id, // Manter o tipo original (string ou number)
+        cardId: selectedCard.id,
         purchaseDate: data.purchaseDate,
         name: data.name,
         category: data.category,
@@ -206,11 +189,10 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         invoiceMonth: invoiceMonth,
       };
 
-      console.log("Dados da compra preparados:", purchaseData);
+      console.log("📦 Dados da compra preparados:", purchaseData);
 
-      // Transformar para formato do Xano
       const xanoData = transformToXano(purchaseData);
-      console.log("Dados para Xano:", xanoData);
+      console.log("🔄 Dados para Xano:", xanoData);
 
       try {
         const response = await apiRequest("POST", "/api/purchases", xanoData);
@@ -222,25 +204,54 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         throw error;
       }
     },
-    onSuccess: (data) => {
-      console.log("✅ Compra criada com sucesso:", data);
+    onSuccess: async (data) => {
+      console.log("🎉 === SUCESSO NA CRIAÇÃO ===");
+      console.log("📊 Dados retornados:", data);
 
-      // Invalidar cache das queries relacionadas
-      queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
+      try {
+        console.log("🔄 Invalidando queries...");
+        
+        // Invalidar queries uma por vez e aguardar
+        console.log("🔄 Invalidando /api/purchases...");
+        await queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+        
+        console.log("🔄 Invalidando /api/invoices...");
+        await queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+        
+        console.log("🔄 Invalidando /api/cards...");
+        await queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
+        
+        console.log("✅ Todas as queries invalidadas com sucesso");
 
-      toast({
-        title: "Sucesso",
-        description: "Compra registrada com sucesso!",
-      });
+        toast({
+          title: "Sucesso",
+          description: "Compra registrada com sucesso!",
+        });
 
-      form.reset();
-      setUseManualMonth(false);
-      onClose();
+        console.log("🔄 Resetando formulário...");
+        form.reset();
+        setUseManualMonth(false);
+        
+        console.log("🚪 Fechando modal...");
+        onClose();
+        
+        console.log("✅ === PROCESSO COMPLETO ===");
+        
+      } catch (error) {
+        console.error("❌ Erro no onSuccess:", error);
+        
+        // Mesmo com erro, tentar fechar o modal
+        toast({
+          title: "Aviso",
+          description: "Compra criada, mas houve erro ao atualizar a interface. Recarregue a página.",
+          variant: "destructive",
+        });
+        onClose();
+      }
     },
     onError: (error) => {
-      console.error("❌ Erro ao criar compra:", error);
+      console.error("❌ === ERRO NA CRIAÇÃO ===");
+      console.error("📋 Detalhes do erro:", error);
 
       toast({
         title: "Erro",
@@ -250,73 +261,53 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     },
   });
 
-  const onSubmit = (data: FormData) => {
-    console.log("=== SUBMIT INICIADO ===");
-    console.log("Dados do formulário:", data);
+  const onSubmit = async (data: FormData) => {
+    console.log("🎬 === SUBMIT INICIADO ===");
+    console.log("📝 Dados do formulário:", data);
 
-    // Validações básicas
+    // Validações
     if (!data.cardId) {
-      toast({
-        title: "Erro",
-        description: "Selecione um cartão",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Selecione um cartão", variant: "destructive" });
       return;
     }
 
     if (!data.name.trim()) {
-      toast({
-        title: "Erro",
-        description: "Nome da compra é obrigatório",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Nome da compra é obrigatório", variant: "destructive" });
       return;
     }
 
     if (!data.category) {
-      toast({
-        title: "Erro",
-        description: "Selecione uma categoria",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Selecione uma categoria", variant: "destructive" });
       return;
     }
 
     const totalValue = parseFloat(data.totalValue);
     if (isNaN(totalValue) || totalValue <= 0) {
-      toast({
-        title: "Erro",
-        description: "Valor total deve ser maior que zero",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Valor total deve ser maior que zero", variant: "destructive" });
       return;
     }
 
     if (data.totalInstallments < 1 || data.totalInstallments > 99) {
-      toast({
-        title: "Erro",
-        description: "Número de parcelas deve ser entre 1 e 99",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Número de parcelas deve ser entre 1 e 99", variant: "destructive" });
       return;
     }
 
-    // CORREÇÃO: Verificar se o cartão existe antes de prosseguir
     const selectedCard = findCardById(data.cardId);
     if (!selectedCard) {
-      toast({
-        title: "Erro",
-        description: "Cartão selecionado não foi encontrado. Tente selecionar novamente.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Cartão selecionado não foi encontrado", variant: "destructive" });
       return;
     }
 
-    console.log("✅ Validações passaram, iniciando criação...");
-    createPurchaseMutation.mutate(data);
+    console.log("✅ Todas as validações passaram");
+    console.log("🚀 Iniciando mutation...");
+    
+    try {
+      await createPurchaseMutation.mutateAsync(data);
+    } catch (error) {
+      console.error("❌ Erro no mutateAsync:", error);
+    }
   };
 
-  // Get selected card for display
   const selectedCard = findCardById(form.watch("cardId"));
 
   return (
@@ -348,7 +339,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     </select>
                   </FormControl>
                   <FormMessage />
-                  {/* Visual feedback for selected card */}
                   {selectedCard && (
                     <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
                       <p className="text-sm text-green-800">
@@ -466,7 +456,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               )}
             />
 
-            {/* Manual invoice month selection toggle */}
             <div className="flex items-center space-x-2 py-2">
               <input
                 type="checkbox"
@@ -480,7 +469,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               </label>
             </div>
 
-            {/* Manual month selection field */}
             {useManualMonth && (
               <FormField
                 control={form.control}
@@ -507,7 +495,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
               />
             )}
 
-            {/* Real-time invoice months preview */}
             {invoiceMonthsPreview && (
               <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center gap-2 mb-2">
@@ -539,11 +526,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     </Badge>
                   ))}
                 </div>
-                {invoiceMonthsPreview.allMonths.length > 1 && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Total: {invoiceMonthsPreview.allMonths.length} parcelas distribuídas
-                  </div>
-                )}
               </div>
             )}
 
