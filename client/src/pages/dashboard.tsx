@@ -21,20 +21,14 @@ export default function Dashboard() {
 
   const { data: cards = [] } = useQuery<CardType[]>({
     queryKey: ["/api/cards"],
-    refetchOnWindowFocus: true,
-    staleTime: 1000 * 60 * 5 // 5 minutos
   });
 
   const { data: recentPurchases = [] } = useQuery<(Purchase & { card: CardType })[]>({
     queryKey: ["/api/purchases"],
-    refetchOnWindowFocus: true,
-    staleTime: 1000 * 60 * 5 // 5 minutos
   });
 
   const { data: monthlyInvoices = [] } = useQuery<any[]>({
     queryKey: ["/api/invoices", currentMonth],
-    refetchOnWindowFocus: true,
-    staleTime: 1000 * 60 * 5 // 5 minutos
   });
 
   const totalCurrentMonth = monthlyInvoices.reduce(
