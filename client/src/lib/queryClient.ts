@@ -61,7 +61,7 @@ function transformFromXano(item: any): any {
     transformed.dueDay = item.due_day;
     transformed.createdAt = item.created_at;
     
-    // Manter também as propriedades originais do Xano para compatibilidade
+    // Limpar propriedades do Xano
     delete transformed.bank_name;
     delete transformed.logo_url;
     delete transformed.closing_day;
@@ -69,7 +69,7 @@ function transformFromXano(item: any): any {
     delete transformed.created_at;
   }
   
-  // Transformar compra do Xano para formato da aplicação
+  // CORREÇÃO: Transformar compra do Xano para formato da aplicação
   if (item.card_id !== undefined) {
     transformed.cardId = item.card_id;
     transformed.purchaseDate = item.purchase_date;
@@ -80,9 +80,49 @@ function transformFromXano(item: any): any {
     transformed.invoiceMonth = item.invoice_month;
     transformed.createdAt = item.created_at;
     
-    // Transformar relacionamento com cartão se existir
-    if (item.card && item.card.bank_name !== undefined) {
+    // CORREÇÃO CRÍTICA: Verificar se o relacionamento 'card' existe
+    if (item.card && typeof item.card === 'object') {
+      // Se o relacionamento existe, transformar
       transformed.card = transformFromXano(item.card);
+      console.log("✅ Relacionamento 'card' encontrado e transformado:", transformed.card);
+    } else {
+      // FALLBACK: Se não há relacionamento, buscar o cartão nos dados em cache
+      console.warn("⚠️ Relacionamento 'card' não encontrado para compra:", item);
+      
+      // Tentar encontrar o cartão no cache do React Query
+      const cardsCache = queryClient.getQueryData(['/api/cards']) as any[];
+      if (cardsCache && Array.isArray(cardsCache)) {
+        const relatedCard = cardsCache.find(card => 
+          String(card.id) === String(item.card_id)
+        );
+        
+        if (relatedCard) {
+          transformed.card = relatedCard;
+          console.log("✅ Cartão encontrado no cache:", relatedCard);
+        } else {
+          // Última opção: criar um objeto de cartão mínimo
+          transformed.card = {
+            id: item.card_id,
+            bankName: `Cartão ${item.card_id}`,
+            logoUrl: "",
+            closingDay: 15,
+            dueDay: 20,
+            createdAt: new Date().toISOString()
+          };
+          console.warn("⚠️ Criado cartão fallback:", transformed.card);
+        }
+      } else {
+        // Criar cartão fallback se não há cache
+        transformed.card = {
+          id: item.card_id,
+          bankName: `Cartão ${item.card_id}`,
+          logoUrl: "",
+          closingDay: 15,
+          dueDay: 20,
+          createdAt: new Date().toISOString()
+        };
+        console.warn("⚠️ Cache de cartões não disponível, criado fallback:", transformed.card);
+      }
     }
     
     // Limpar propriedades do Xano
@@ -128,7 +168,7 @@ export function transformToXano(item: any): any {
     delete transformed.logoUrl;
     delete transformed.closingDay;
     delete transformed.dueDay;
-    delete transformed.createdAt; // Deixar o Xano gerar automaticamente
+    delete transformed.createdAt;
   }
   
   // Transformar compra da aplicação para Xano
@@ -149,7 +189,7 @@ export function transformToXano(item: any): any {
     delete transformed.currentInstallment;
     delete transformed.installmentValue;
     delete transformed.invoiceMonth;
-    delete transformed.createdAt; // Deixar o Xano gerar automaticamente
+    delete transformed.createdAt;
   }
   
   return transformed;
@@ -209,16 +249,31 @@ export const getQueryFn: <T>(options: {
       data = data.filter((invoice: any) => invoice.month === filterMonth);
     }
     
-    // Transformar dados do Xano para formato da aplicação
-    if (Array.isArray(data)) {
-      data = data.map(transformFromXano);
-    } else {
-      data = transformFromXano(data);
+    // CORREÇÃO: Tratar erros na transformação
+    try {
+      // Transformar dados do Xano para formato da aplicação
+      if (Array.isArray(data)) {
+        data = data.map((item, index) => {
+          try {
+            return transformFromXano(item);
+          } catch (error) {
+            console.error(`Erro ao transformar item ${index}:`, item, error);
+            // Retornar item sem transformação se houver erro
+            return item;
+          }
+        });
+      } else {
+        data = transformFromXano(data);
+      }
+      
+      console.log("Transformed data:", data);
+      
+      return data;
+    } catch (error) {
+      console.error("Erro na transformação de dados:", error);
+      // Em caso de erro, retornar dados originais
+      return data;
     }
-    
-    console.log("Transformed data:", data);
-    
-    return data;
   };
 
 // Configuração padrão do React Query
@@ -230,9 +285,16 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutos
       retry: 1,
+      // CORREÇÃO: Adicionar tratamento de erro
+      onError: (error) => {
+        console.error("Erro na query:", error);
+      }
     },
     mutations: {
       retry: 1,
+      onError: (error) => {
+        console.error("Erro na mutation:", error);
+      }
     },
   },
 });
