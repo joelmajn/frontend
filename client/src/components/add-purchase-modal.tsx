@@ -459,3 +459,171 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="totalInstallments"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Número de Parcelas</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="99"
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Opção de compra recorrente */}
+            {!selectedCategoryData?.isRecurring && (
+              <div className="flex items-center space-x-2 py-2">
+                <Checkbox
+                  id="isRecurring"
+                  checked={isRecurringPurchase}
+                  onCheckedChange={setIsRecurringPurchase}
+                />
+                <label htmlFor="isRecurring" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Compra recorrente (repetir mensalmente)
+                </label>
+              </div>
+            )}
+
+            {/* Manual invoice month selection toggle */}
+            <div className="flex items-center space-x-2 py-2">
+              <Checkbox
+                id="useManualMonth"
+                checked={useManualMonth}
+                onCheckedChange={setUseManualMonth}
+              />
+              <label htmlFor="useManualMonth" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Selecionar mês da fatura manualmente
+              </label>
+            </div>
+
+            {/* Manual month selection field */}
+            {useManualMonth && (
+              <FormField
+                control={form.control}
+                name="manualInvoiceMonth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mês da Fatura</FormLabel>
+                    <FormControl>
+                      <select
+                        {...field}
+                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="">Selecione o mês da fatura</option>
+                        {availableMonths.map((month) => (
+                          <option key={month.value} value={month.value}>
+                            {month.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Real-time invoice months preview */}
+            {invoiceMonthsPreview && (
+              <div className={`p-3 rounded-lg border ${
+                invoiceMonthsPreview.isRecurring 
+                  ? 'bg-purple-50 border-purple-200' 
+                  : 'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className={`h-4 w-4 ${
+                    invoiceMonthsPreview.isRecurring ? 'text-purple-600' : 'text-blue-600'
+                  }`} />
+                  <span className={`text-sm font-medium ${
+                    invoiceMonthsPreview.isRecurring ? 'text-purple-900' : 'text-blue-900'
+                  }`}>
+                    {invoiceMonthsPreview.isRecurring ? "Compra Recorrente" : "Previsão das Parcelas"}
+                  </span>
+                </div>
+                
+                <div className={`text-xs mb-2 ${
+                  invoiceMonthsPreview.isRecurring ? 'text-purple-700' : 'text-blue-700'
+                }`}>
+                  {invoiceMonthsPreview.isRecurring 
+                    ? "Esta compra se repetirá automaticamente todos os meses"
+                    : invoiceMonthsPreview.isManual 
+                      ? "Mês da fatura selecionado manualmente" 
+                      : invoiceMonthsPreview.isNextMonth 
+                        ? "Compra após o fechamento - vai para a próxima fatura"
+                        : "Compra antes do fechamento - entra na fatura atual"
+                  }
+                </div>
+                
+                <div className="flex flex-wrap gap-1">
+                  {invoiceMonthsPreview.allMonths.map((month, index) => (
+                    <Badge 
+                      key={index} 
+                      variant="secondary" 
+                      className={`text-xs ${
+                        invoiceMonthsPreview.isRecurring
+                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                          : invoiceMonthsPreview.isManual 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                      }`}
+                    >
+                      {invoiceMonthsPreview.isRecurring ? "🔄" : `${index + 1}ª:`} {month}
+                    </Badge>
+                  ))}
+                </div>
+                
+                {!invoiceMonthsPreview.isRecurring && invoiceMonthsPreview.allMonths.length > 1 && (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    Total: {invoiceMonthsPreview.allMonths.length} parcelas distribuídas
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+                disabled={createPurchaseMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-primary hover:bg-blue-700"
+                disabled={createPurchaseMutation.isPending}
+              >
+                {createPurchaseMutation.isPending ? "Salvando..." : "Salvar Compra"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+
+      <CategoryManager
+        isOpen={isCategoryManagerOpen}
+        onClose={() => {
+          setIsCategoryManagerOpen(false);
+          loadCategoriesFromStorage(); // Recarregar categorias após fechar o manager
+        }}
+        categories={customCategories}
+        onCategoriesChange={setCustomCategories}
+      />
+    </Dialog>
+  );
+}
