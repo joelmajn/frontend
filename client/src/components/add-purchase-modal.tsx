@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, transformToXano } from "@/lib/queryClient";
 import { insertPurchaseSchema, type InsertPurchase, type Card } from "@shared/schema";
 import { calculateInstallmentMonths, formatMonthsForDisplay } from "@shared/invoice-calculator";
 import { z } from "zod";
-import { Settings, Calendar } from "lucide-react";
+import { Settings, Calendar, RotateCcw } from "lucide-react";
 import CategoryManager from "@/components/category-manager";
 
 const formSchema = insertPurchaseSchema.extend({
@@ -24,24 +25,77 @@ const formSchema = insertPurchaseSchema.extend({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface Category {
+  value: string;
+  label: string;
+  isDefault?: boolean;
+  isRecurring?: boolean;
+}
+
 interface AddPurchaseModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Categorias padrão
+const DEFAULT_CATEGORIES: Category[] = [
+  { value: "alimentacao", label: "Alimentação", isDefault: true },
+  { value: "eletronicos", label: "Eletrônicos", isDefault: true },
+  { value: "combustivel", label: "Combustível", isDefault: true },
+  { value: "vestuario", label: "Vestuário", isDefault: true },
+  { value: "saude", label: "Saúde", isDefault: true },
+  { value: "assinatura", label: "Assinatura", isDefault: true, isRecurring: true },
+  { value: "outros", label: "Outros", isDefault: true },
+];
 
 export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [useManualMonth, setUseManualMonth] = useState(false);
-  const [customCategories, setCustomCategories] = useState([
-    { value: "alimentacao", label: "Alimentação" },
-    { value: "eletronicos", label: "Eletrônicos" },
-    { value: "combustivel", label: "Combustível" },
-    { value: "vestuario", label: "Vestuário" },
-    { value: "saude", label: "Saúde" },
-    { value: "outros", label: "Outros" },
-  ]);
+  const [isRecurringPurchase, setIsRecurringPurchase] = useState(false);
+  const [customCategories, setCustomCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+
+  // Carregar categorias do localStorage ao abrir o modal
+  useEffect(() => {
+    if (isOpen) {
+      loadCategoriesFromStorage();
+    }
+  }, [isOpen]);
+
+  const loadCategoriesFromStorage = () => {
+    try {
+      const stored = localStorage.getItem("custom_categories");
+      
+      if (stored) {
+        const storedCategories = JSON.parse(stored);
+        // Mesclar categorias padrão com customizadas
+        const merged = mergeCategories(DEFAULT_CATEGORIES, storedCategories);
+        setCustomCategories(merged);
+      } else {
+        setCustomCategories([...DEFAULT_CATEGORIES]);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error);
+      setCustomCategories([...DEFAULT_CATEGORIES]);
+    }
+  };
+
+  const mergeCategories = (defaultCats: Category[], customCats: Category[]): Category[] => {
+    const merged = [...defaultCats];
+    
+    customCats.forEach(customCat => {
+      const existingIndex = merged.findIndex(cat => cat.value === customCat.value);
+      
+      if (existingIndex >= 0) {
+        merged[existingIndex] = { ...merged[existingIndex], ...customCat };
+      } else {
+        merged.push(customCat);
+      }
+    });
+    
+    return merged;
+  };
 
   // Generate available months for manual selection
   const availableMonths = useMemo(() => {
@@ -82,15 +136,21 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   const findCardById = (cardId: string | number) => {
     if (!cardId) return null;
     
-    console.log("🔍 Procurando cartão com ID:", cardId, "Tipo:", typeof cardId);
-    console.log("📋 Cartões disponíveis:", cards.map(c => ({ id: c.id, type: typeof c.id, name: c.bankName })));
-    
     const searchId = String(cardId);
     const found = cards.find(card => String(card.id) === searchId) || null;
-    
-    console.log("✅ Cartão encontrado:", found);
     return found;
   };
+
+  // Detectar se a categoria selecionada é recorrente
+  const selectedCategory = form.watch("category");
+  const selectedCategoryData = customCategories.find(cat => cat.value === selectedCategory);
+
+  // Automatically set recurring if category is recurring
+  useEffect(() => {
+    if (selectedCategoryData?.isRecurring) {
+      setIsRecurringPurchase(true);
+    }
+  }, [selectedCategoryData]);
 
   const invoiceMonthsPreview = useMemo(() => {
     const cardId = form.watch("cardId");
@@ -135,22 +195,17 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       firstMonth: displayMonths[0],
       allMonths: displayMonths,
       isNextMonth,
-      isManual: useManualMonth && manualInvoiceMonth
+      isManual: useManualMonth && manualInvoiceMonth,
+      isRecurring: isRecurringPurchase || selectedCategoryData?.isRecurring
     };
-  }, [form.watch("cardId"), form.watch("purchaseDate"), form.watch("totalInstallments"), form.watch("manualInvoiceMonth"), cards, useManualMonth]);
+  }, [form.watch("cardId"), form.watch("purchaseDate"), form.watch("totalInstallments"), form.watch("manualInvoiceMonth"), cards, useManualMonth, isRecurringPurchase, selectedCategoryData]);
 
   const createPurchaseMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      console.log("🚀 === INÍCIO CRIAÇÃO COMPRA ===");
-      console.log("📝 Dados do formulário:", data);
-
       const selectedCard = findCardById(data.cardId);
       if (!selectedCard) {
-        console.error("❌ ERRO: Cartão não encontrado!");
         throw new Error("Cartão não encontrado");
       }
-
-      console.log("✅ Cartão encontrado:", selectedCard);
 
       const totalValue = parseFloat(data.totalValue);
       if (isNaN(totalValue) || totalValue <= 0) {
@@ -189,70 +244,39 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
         invoiceMonth: invoiceMonth,
       };
 
-      console.log("📦 Dados da compra preparados:", purchaseData);
-
       const xanoData = transformToXano(purchaseData);
-      console.log("🔄 Dados para Xano:", xanoData);
+
+      // Se for compra recorrente, adicionar metadata
+      if (isRecurringPurchase || selectedCategoryData?.isRecurring) {
+        xanoData.is_recurring = true;
+      }
 
       try {
         const response = await apiRequest("POST", "/api/purchases", xanoData);
         const result = await response.json();
-        console.log("✅ Resposta do Xano:", result);
         return result;
       } catch (error) {
-        console.error("❌ Erro na API:", error);
         throw error;
       }
     },
     onSuccess: async (data) => {
-      console.log("🎉 === SUCESSO NA CRIAÇÃO ===");
-      console.log("📊 Dados retornados:", data);
+      await queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
 
-      try {
-        console.log("🔄 Invalidando queries...");
-        
-        // Invalidar queries uma por vez e aguardar
-        console.log("🔄 Invalidando /api/purchases...");
-        await queryClient.invalidateQueries({ queryKey: ["/api/purchases"] });
-        
-        console.log("🔄 Invalidando /api/invoices...");
-        await queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-        
-        console.log("🔄 Invalidando /api/cards...");
-        await queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
-        
-        console.log("✅ Todas as queries invalidadas com sucesso");
+      toast({
+        title: "Sucesso",
+        description: isRecurringPurchase || selectedCategoryData?.isRecurring 
+          ? "Compra recorrente registrada com sucesso!"
+          : "Compra registrada com sucesso!",
+      });
 
-        toast({
-          title: "Sucesso",
-          description: "Compra registrada com sucesso!",
-        });
-
-        console.log("🔄 Resetando formulário...");
-        form.reset();
-        setUseManualMonth(false);
-        
-        console.log("🚪 Fechando modal...");
-        onClose();
-        
-        console.log("✅ === PROCESSO COMPLETO ===");
-        
-      } catch (error) {
-        console.error("❌ Erro no onSuccess:", error);
-        
-        // Mesmo com erro, tentar fechar o modal
-        toast({
-          title: "Aviso",
-          description: "Compra criada, mas houve erro ao atualizar a interface. Recarregue a página.",
-          variant: "destructive",
-        });
-        onClose();
-      }
+      form.reset();
+      setUseManualMonth(false);
+      setIsRecurringPurchase(false);
+      onClose();
     },
     onError: (error) => {
-      console.error("❌ === ERRO NA CRIAÇÃO ===");
-      console.error("📋 Detalhes do erro:", error);
-
       toast({
         title: "Erro",
         description: `Erro ao registrar compra: ${error.message}`,
@@ -262,9 +286,6 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
   });
 
   const onSubmit = async (data: FormData) => {
-    console.log("🎬 === SUBMIT INICIADO ===");
-    console.log("📝 Dados do formulário:", data);
-
     // Validações
     if (!data.cardId) {
       toast({ title: "Erro", description: "Selecione um cartão", variant: "destructive" });
@@ -298,13 +319,10 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
       return;
     }
 
-    console.log("✅ Todas as validações passaram");
-    console.log("🚀 Iniciando mutation...");
-    
     try {
       await createPurchaseMutation.mutateAsync(data);
     } catch (error) {
-      console.error("❌ Erro no mutateAsync:", error);
+      console.error("Erro no mutateAsync:", error);
     }
   };
 
@@ -407,12 +425,21 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                       <option value="">Selecione a categoria</option>
                       {customCategories.map((category) => (
                         <option key={category.value} value={category.value}>
-                          {category.label}
+                          {category.label}{category.isRecurring ? " 🔄" : ""}
                         </option>
                       ))}
                     </select>
                   </FormControl>
                   <FormMessage />
+                  
+                  {/* Aviso sobre categoria recorrente */}
+                  {selectedCategoryData?.isRecurring && (
+                    <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                      <p className="text-sm text-purple-800">
+                        🔄 Esta categoria é recorrente - aparecerá automaticamente todos os meses
+                      </p>
+                    </div>
+                  )}
                 </FormItem>
               )}
             />
@@ -432,131 +459,3 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
                     />
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="totalInstallments"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Parcelas</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="99"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="flex items-center space-x-2 py-2">
-              <input
-                type="checkbox"
-                id="useManualMonth"
-                checked={useManualMonth}
-                onChange={(e) => setUseManualMonth(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="useManualMonth" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Selecionar mês da fatura manualmente
-              </label>
-            </div>
-
-            {useManualMonth && (
-              <FormField
-                control={form.control}
-                name="manualInvoiceMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mês da Fatura</FormLabel>
-                    <FormControl>
-                      <select
-                        {...field}
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        <option value="">Selecione o mês da fatura</option>
-                        {availableMonths.map((month) => (
-                          <option key={month.value} value={month.value}>
-                            {month.label}
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {invoiceMonthsPreview && (
-              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Previsão das Parcelas
-                  </span>
-                </div>
-                <div className="text-xs text-blue-700 dark:text-blue-300 mb-2">
-                  {invoiceMonthsPreview.isManual 
-                    ? "Mês da fatura selecionado manualmente" 
-                    : invoiceMonthsPreview.isNextMonth 
-                      ? "Compra após o fechamento - vai para a próxima fatura"
-                      : "Compra antes do fechamento - entra na fatura atual"
-                  }
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {invoiceMonthsPreview.allMonths.map((month, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="secondary" 
-                      className={`text-xs ${
-                        invoiceMonthsPreview.isManual 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      }`}
-                    >
-                      {index + 1}ª: {month}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={onClose}
-                disabled={createPurchaseMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-primary hover:bg-blue-700"
-                disabled={createPurchaseMutation.isPending}
-              >
-                {createPurchaseMutation.isPending ? "Salvando..." : "Salvar Compra"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-
-      <CategoryManager
-        isOpen={isCategoryManagerOpen}
-        onClose={() => setIsCategoryManagerOpen(false)}
-        categories={customCategories}
-        onCategoriesChange={setCustomCategories}
-      />
-    </Dialog>
-  );
-}
