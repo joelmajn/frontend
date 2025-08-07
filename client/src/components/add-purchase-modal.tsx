@@ -44,9 +44,21 @@ const DEFAULT_CATEGORIES: Category[] = [
   { value: "combustivel", label: "Combustível", isDefault: true },
   { value: "vestuario", label: "Vestuário", isDefault: true },
   { value: "saude", label: "Saúde", isDefault: true },
+  { value: "transporte", label: "Transporte", isDefault: true },
+  { value: "lazer", label: "Lazer", isDefault: true },
+  { value: "educacao", label: "Educação", isDefault: true },
+  { value: "casa", label: "Casa e Decoração", isDefault: true },
   { value: "assinatura", label: "Assinatura", isDefault: true, isRecurring: true },
   { value: "outros", label: "Outros", isDefault: true },
 ];
+
+// Função para corrigir timezone local
+const formatDateForInput = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalProps) {
   const { toast } = useToast();
@@ -119,7 +131,7 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     resolver: zodResolver(formSchema),
     defaultValues: {
       cardId: "",
-      purchaseDate: "",
+      purchaseDate: formatDateForInput(new Date()), // ✅ Correção do timezone
       name: "",
       category: "",
       totalValue: "",
@@ -271,7 +283,16 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
           : "Compra registrada com sucesso!",
       });
 
-      form.reset();
+      form.reset({
+        cardId: "",
+        purchaseDate: formatDateForInput(new Date()), // ✅ Reset com data correta
+        name: "",
+        category: "",
+        totalValue: "",
+        totalInstallments: 1,
+        currentInstallment: 1,
+        manualInvoiceMonth: "",
+      });
       setUseManualMonth(false);
       setIsRecurringPurchase(false);
       onClose();
@@ -298,332 +319,4 @@ export default function AddPurchaseModal({ isOpen, onClose }: AddPurchaseModalPr
     }
 
     if (!data.category) {
-      toast({ title: "Erro", description: "Selecione uma categoria", variant: "destructive" });
-      return;
-    }
-
-    const totalValue = parseFloat(data.totalValue);
-    if (isNaN(totalValue) || totalValue <= 0) {
-      toast({ title: "Erro", description: "Valor total deve ser maior que zero", variant: "destructive" });
-      return;
-    }
-
-    if (data.totalInstallments < 1 || data.totalInstallments > 99) {
-      toast({ title: "Erro", description: "Número de parcelas deve ser entre 1 e 99", variant: "destructive" });
-      return;
-    }
-
-    const selectedCard = findCardById(data.cardId);
-    if (!selectedCard) {
-      toast({ title: "Erro", description: "Cartão selecionado não foi encontrado", variant: "destructive" });
-      return;
-    }
-
-    try {
-      await createPurchaseMutation.mutateAsync(data);
-    } catch (error) {
-      console.error("Erro no mutateAsync:", error);
-    }
-  };
-
-  const selectedCard = findCardById(form.watch("cardId"));
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Registrar Nova Compra</DialogTitle>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="cardId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cartão</FormLabel>
-                  <FormControl>
-                    <select
-                      {...field}
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    >
-                      <option value="">Selecione o cartão</option>
-                      {cards.map((card) => (
-                        <option key={card.id} value={String(card.id)}>
-                          {card.bankName}
-                        </option>
-                      ))}
-                    </select>
-                  </FormControl>
-                  <FormMessage />
-                  {selectedCard && (
-                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                      <p className="text-sm text-green-800">
-                        ✓ Cartão selecionado: {selectedCard.bankName}
-                      </p>
-                      <p className="text-xs text-green-600">
-                        Fechamento dia {selectedCard.closingDay}
-                      </p>
-                    </div>
-                  )}
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="purchaseDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Data da Compra</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome da Compra</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Compra no supermercado" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Categoria</FormLabel>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsCategoryManagerOpen(true)}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Settings className="h-3 w-3 mr-1" />
-                      Gerenciar
-                    </Button>
-                  </div>
-                  <FormControl>
-                    <select
-                      {...field}
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    >
-                      <option value="">Selecione a categoria</option>
-                      {customCategories.map((category) => (
-                        <option key={category.value} value={category.value}>
-                          {category.label}{category.isRecurring ? " 🔄" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </FormControl>
-                  <FormMessage />
-                  
-                  {/* Aviso sobre categoria recorrente */}
-                  {selectedCategoryData?.isRecurring && (
-                    <div className="mt-2 p-2 bg-purple-50 border border-purple-200 rounded">
-                      <p className="text-sm text-purple-800">
-                        🔄 Esta categoria é recorrente - aparecerá automaticamente todos os meses
-                      </p>
-                    </div>
-                  )}
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="totalValue"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Valor Total</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="totalInstallments"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Parcelas</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="99"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Opção de compra recorrente */}
-            {!selectedCategoryData?.isRecurring && (
-              <div className="flex items-center space-x-2 py-2">
-                <Checkbox
-                  id="isRecurring"
-                  checked={isRecurringPurchase}
-                  onCheckedChange={setIsRecurringPurchase}
-                />
-                <label htmlFor="isRecurring" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Compra recorrente (repetir mensalmente)
-                </label>
-              </div>
-            )}
-
-            {/* Manual invoice month selection toggle */}
-            <div className="flex items-center space-x-2 py-2">
-              <Checkbox
-                id="useManualMonth"
-                checked={useManualMonth}
-                onCheckedChange={setUseManualMonth}
-              />
-              <label htmlFor="useManualMonth" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Selecionar mês da fatura manualmente
-              </label>
-            </div>
-
-            {/* Manual month selection field */}
-            {useManualMonth && (
-              <FormField
-                control={form.control}
-                name="manualInvoiceMonth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mês da Fatura</FormLabel>
-                    <FormControl>
-                      <select
-                        {...field}
-                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        <option value="">Selecione o mês da fatura</option>
-                        {availableMonths.map((month) => (
-                          <option key={month.value} value={month.value}>
-                            {month.label}
-                          </option>
-                        ))}
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Real-time invoice months preview */}
-            {invoiceMonthsPreview && (
-              <div className={`p-3 rounded-lg border ${
-                invoiceMonthsPreview.isRecurring 
-                  ? 'bg-purple-50 border-purple-200' 
-                  : 'bg-blue-50 border-blue-200'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className={`h-4 w-4 ${
-                    invoiceMonthsPreview.isRecurring ? 'text-purple-600' : 'text-blue-600'
-                  }`} />
-                  <span className={`text-sm font-medium ${
-                    invoiceMonthsPreview.isRecurring ? 'text-purple-900' : 'text-blue-900'
-                  }`}>
-                    {invoiceMonthsPreview.isRecurring ? "Compra Recorrente" : "Previsão das Parcelas"}
-                  </span>
-                </div>
-                
-                <div className={`text-xs mb-2 ${
-                  invoiceMonthsPreview.isRecurring ? 'text-purple-700' : 'text-blue-700'
-                }`}>
-                  {invoiceMonthsPreview.isRecurring 
-                    ? "Esta compra se repetirá automaticamente todos os meses"
-                    : invoiceMonthsPreview.isManual 
-                      ? "Mês da fatura selecionado manualmente" 
-                      : invoiceMonthsPreview.isNextMonth 
-                        ? "Compra após o fechamento - vai para a próxima fatura"
-                        : "Compra antes do fechamento - entra na fatura atual"
-                  }
-                </div>
-                
-                <div className="flex flex-wrap gap-1">
-                  {invoiceMonthsPreview.allMonths.map((month, index) => (
-                    <Badge 
-                      key={index} 
-                      variant="secondary" 
-                      className={`text-xs ${
-                        invoiceMonthsPreview.isRecurring
-                          ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
-                          : invoiceMonthsPreview.isManual 
-                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                            : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                      }`}
-                    >
-                      {invoiceMonthsPreview.isRecurring ? "🔄" : `${index + 1}ª:`} {month}
-                    </Badge>
-                  ))}
-                </div>
-                
-                {!invoiceMonthsPreview.isRecurring && invoiceMonthsPreview.allMonths.length > 1 && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    Total: {invoiceMonthsPreview.allMonths.length} parcelas distribuídas
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={onClose}
-                disabled={createPurchaseMutation.isPending}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-primary hover:bg-blue-700"
-                disabled={createPurchaseMutation.isPending}
-              >
-                {createPurchaseMutation.isPending ? "Salvando..." : "Salvar Compra"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-
-      <CategoryManager
-        isOpen={isCategoryManagerOpen}
-        onClose={() => {
-          setIsCategoryManagerOpen(false);
-          loadCategoriesFromStorage(); // Recarregar categorias após fechar o manager
-        }}
-        categories={customCategories}
-        onCategoriesChange={setCustomCategories}
-      />
-    </Dialog>
-  );
-}
+      toast({ title:
