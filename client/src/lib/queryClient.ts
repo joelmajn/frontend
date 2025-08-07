@@ -74,7 +74,7 @@ function transformFromXano(item: any): any {
     delete transformed.created_at;
   }
   
-  // CORREÇÃO: Transformar compra do Xano para formato da aplicação
+  // Transformar compra do Xano para formato da aplicação
   if (item.card_id !== undefined) {
     transformed.cardId = item.card_id;
     transformed.purchaseDate = item.purchase_date;
@@ -83,10 +83,10 @@ function transformFromXano(item: any): any {
     transformed.currentInstallment = item.current_installment;
     transformed.installmentValue = item.installment_value?.toString() || "0";
     transformed.invoiceMonth = item.invoice_month;
-    transformed.subscriptionId = item.subscription_id; // ✅ Novo campo
+    transformed.subscriptionId = item.subscription_id;
     transformed.createdAt = item.created_at;
     
-    // CORREÇÃO CRÍTICA: Verificar se o relacionamento 'card' existe
+    // Verificar se o relacionamento 'card' existe
     if (item.card && typeof item.card === 'object') {
       // Se o relacionamento existe, transformar
       transformed.card = transformFromXano(item.card);
@@ -104,4 +104,133 @@ function transformFromXano(item: any): any {
         
         if (relatedCard) {
           transformed.card = relatedCard;
-          console.
+          console.log("✅ Cartão encontrado no cache:", relatedCard);
+        } else {
+          console.error("❌ Cartão não encontrado no cache para ID:", item.card_id);
+          // Criar um cartão placeholder
+          transformed.card = {
+            id: item.card_id,
+            bankName: `Cartão ${item.card_id}`,
+            logoUrl: "",
+            closingDay: 15,
+            dueDay: 20,
+            createdAt: new Date().toISOString()
+          };
+        }
+      } else {
+        console.warn("⚠️ Cache de cartões não disponível");
+        // Criar um cartão placeholder
+        transformed.card = {
+          id: item.card_id,
+          bankName: `Cartão ${item.card_id}`,
+          logoUrl: "",
+          closingDay: 15,
+          dueDay: 20,
+          createdAt: new Date().toISOString()
+        };
+      }
+    }
+    
+    // Limpar propriedades do Xano
+    delete transformed.card_id;
+    delete transformed.purchase_date;
+    delete transformed.total_value;
+    delete transformed.total_installments;
+    delete transformed.current_installment;
+    delete transformed.installment_value;
+    delete transformed.invoice_month;
+    delete transformed.subscription_id;
+    delete transformed.created_at;
+  }
+  
+  return transformed;
+}
+
+// Função para transformar dados da aplicação para o formato do Xano
+export function transformToXano(item: any): any {
+  if (!item) return item;
+  
+  const transformed = { ...item };
+  
+  // Transformar cartão para formato do Xano
+  if (item.bankName !== undefined) {
+    transformed.bank_name = item.bankName;
+    transformed.logo_url = item.logoUrl || "";
+    transformed.closing_day = item.closingDay;
+    transformed.due_day = item.dueDay;
+    
+    // Limpar propriedades da aplicação
+    delete transformed.bankName;
+    delete transformed.logoUrl;
+    delete transformed.closingDay;
+    delete transformed.dueDay;
+    delete transformed.createdAt;
+    delete transformed.id; // Não enviar ID em criações
+  }
+  
+  // Transformar compra para formato do Xano
+  if (item.cardId !== undefined) {
+    transformed.card_id = item.cardId;
+    transformed.purchase_date = item.purchaseDate;
+    transformed.total_value = parseFloat(item.totalValue);
+    transformed.total_installments = item.totalInstallments;
+    transformed.current_installment = item.currentInstallment;
+    transformed.installment_value = parseFloat(item.installmentValue);
+    transformed.invoice_month = item.invoiceMonth;
+    
+    if (item.subscriptionId) {
+      transformed.subscription_id = item.subscriptionId;
+    }
+    
+    // Limpar propriedades da aplicação
+    delete transformed.cardId;
+    delete transformed.purchaseDate;
+    delete transformed.totalValue;
+    delete transformed.totalInstallments;
+    delete transformed.currentInstallment;
+    delete transformed.installmentValue;
+    delete transformed.invoiceMonth;
+    delete transformed.subscriptionId;
+    delete transformed.createdAt;
+    delete transformed.id; // Não enviar ID em criações
+    delete transformed.card; // Não enviar relacionamento
+  }
+  
+  return transformed;
+}
+
+// Query function genérica
+const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
+  const endpoint = queryKey[0] as string;
+  console.log("Fazendo query para:", endpoint);
+  
+  const res = await apiRequest("GET", endpoint);
+  const data = await res.json();
+  
+  console.log("Dados recebidos do Xano:", data);
+  
+  // Transformar dados do Xano para formato da aplicação
+  if (Array.isArray(data)) {
+    const transformed = data.map(transformFromXano);
+    console.log("Dados transformados:", transformed);
+    return transformed;
+  } else {
+    const transformed = transformFromXano(data);
+    console.log("Dado transformado:", transformed);
+    return transformed;
+  }
+};
+
+// Criar instância do QueryClient
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: defaultQueryFn,
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      networkMode: "offlineFirst",
+    },
+  },
+});
